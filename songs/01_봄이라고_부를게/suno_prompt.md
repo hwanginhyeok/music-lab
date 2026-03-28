@@ -74,5 +74,5 @@ I just called you, wanna see you
 
 I wanna call you spring
 I just called you, wanna see you
-오늘 벚꽃이 피었더라
-그래서 전화해봤어
+너를 봄이라고 부를게
+네가 보고 싶어서 전화했어
