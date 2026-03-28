@@ -3,4 +3,7 @@ __pycache__/
 *.mid
 *.wav
 *.mp3
+*.ogg
 .env
+data/
+.pytest_cache/
