@@ -83,8 +83,8 @@ I just called you, wanna see you
 
 I wanna call you spring
 I just called you, wanna see you
-...아 그리고 있잖아
-나 오늘 벚꽃 봤어, 그래서...
+오늘 벚꽃이 피었더라
+그래서 전화해봤어...
 
 ---
 
