@@ -53,14 +53,14 @@ I wanna call you spring
 
 ## Chorus 2
 
-너를 보려고 불러볼게
-사실 봄이 온 게 아니라 네가 보고 싶은 거야
+네가 보고 싶어서 전화했어
+봄이 와서가 아니라 너를 보고 싶은 거야
 꽃이 피는 건 핑계였어
 그냥 네 목소리가 듣고 싶었던 거야
 
-I wanna call you to see you
-전화를 걸어 네 봄을 묻는 건
-내가 아직 겨울이라는 뜻이야
+I just called you, wanna see you
+계절 핑계 대다가 결국 눌러버린 번호
+나는 아직 겨울인데 너는 벌써 봄이야
 
 ## Bridge
 
@@ -77,14 +77,14 @@ I wanna call you to see you
 ## Final Chorus
 
 너를 봄이라고 부를게
-너를 보려고 불러볼게
+네가 보고 싶어서 전화했어
 같은 말인데 이상하지
 봄은 오는데 넌 오지 않아
 
 I wanna call you spring
-I wanna call you to see you
-같은 건데 다른 말
-부르고 싶은데 부를 수 없는 이름
+I just called you, wanna see you
+부르고 불렀는데
+돌아오는 건 신호음뿐이야
 
 ---
 
@@ -92,8 +92,10 @@ I wanna call you to see you
 
 **언어유희 구조:**
 - 1절 싸비: 봄 = spring (계절) / 부르다 = call (이름 부르기) → "너를 봄이라고 부를게"
-- 2절 싸비: 봄 = 보다(see)의 명사형 / 부르다 = call (전화하다) → "너를 보려고 전화할게"
-- Final: 두 의미가 겹치면서 "같은 말인데 다른 말"이라는 자각
+- 2절 싸비: 봄 = 보고 싶다(see) / call = 전화했어 → "네가 보고 싶어서 전화했어"
+  - 1절의 우회적 표현이 벗겨지고 진심이 터지는 순간
+  - "I just called you, wanna see you" — called(전화했어) + see(보고싶어) = 봄의 이중 의미
+- Final: 두 의미가 겹치면서 "같은 말인데 이상하지" + "돌아오는 건 신호음뿐"으로 여운
 
 **김이나 스타일 반영:**
 - "벚꽃 같다고 하면 너무 뻔한 거잖아" — 뻔한 비유를 의식적으로 피하는 자의식 (김이나 특유의 메타 화법)
