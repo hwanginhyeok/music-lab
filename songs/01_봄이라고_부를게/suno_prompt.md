@@ -58,7 +58,7 @@ I just called you, wanna see you
 [Bridge]
 투르르 투르르
 신호만 다섯 번째
-여보세요가 들리면
+니 목소리가 들리면
 나는 아마 또
 요즘 날씨 좋지 않아 로
 시작하겠지
