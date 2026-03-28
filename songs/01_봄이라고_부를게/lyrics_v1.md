@@ -78,7 +78,7 @@ I just called you, wanna see you
 
 너를 봄이라고 부를게
 네가 보고 싶어서 전화했어
-같은 말인데... 이상하다
+같은 말인데... 이상해
 봄은 매년 오잖아, 근데 너는
 
 I wanna call you spring
