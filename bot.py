@@ -248,6 +248,12 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "/theory [질문]\n"
         "  예: /theory 마이너 스케일이 뭐야?\n\n"
         "/new — 새 대화 시작 (이전 맥락 초기화)\n\n"
+        "💡 영감 노트\n"
+        "/idea [설명] — 아이디어를 즉시 MIDI로 기록\n"
+        "/library — 저장된 아이디어 모아보기\n"
+        "/export [번호] — MIDI 파일 다시 받기\n"
+        "/remix [번호] [스타일] — 아이디어 변형\n\n"
+        "📝 /quiz — 음악 이론 퀴즈\n\n"
         "💬 명령어 없이 자유롭게 대화해도 OK\n"
         "💡 대화 맥락을 기억해서 \"아까 그 코드 바꿔줘\" 가능!",
     )
@@ -425,6 +431,268 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
 
 
 # ---------------------------------------------------------------------------
+# Stage 2: 영감 노트 (/idea, /library, /export, /remix)
+# ---------------------------------------------------------------------------
+async def cmd_idea(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """짧은 음악 아이디어를 즉시 MIDI 스니펫으로 기록."""
+    if not update.effective_user or not update.message:
+        return
+    desc = " ".join(ctx.args) if ctx.args else ""
+    if not desc:
+        await update.message.reply_text(
+            "💡 사용법: /idea [설명]\n예: /idea 비오는 날 피아노 루프"
+        )
+        return
+
+    user_id = update.effective_user.id
+    lock = _user_locks[user_id]
+    if lock.locked():
+        await update.message.reply_text("⏳ 이전 요청을 처리 중이에요.")
+        return
+
+    async with lock:
+        await update.message.reply_text("💡 아이디어를 MIDI로 변환 중...")
+
+        # Claude에게 짧은 MIDI 스니펫 + 태그 요청
+        response = await ask_claude(
+            f"음악 아이디어: '{desc}'\n\n"
+            "이 아이디어를 4마디 이내의 짧은 MIDI 스니펫으로 만들어줘. midi-json 블록으로 포함해.\n"
+            "그리고 응답 마지막에 이 아이디어에 어울리는 태그를 아래 형식으로 달아줘:\n"
+            "태그: #장르 #감정 #악기\n"
+            "예: 태그: #재즈 #몽환적 #피아노"
+        )
+
+        # 태그 추출
+        tags = _extract_tags(response)
+        midi_data = parse_midi_json(response)
+        midi_json_str = json.dumps(midi_data, ensure_ascii=False) if midi_data else None
+
+        # MIDI 파일 저장
+        midi_path = None
+        if midi_data:
+            try:
+                midi_bytes = generate_midi(midi_data)
+                midi_dir = Path(f"data/midi/{user_id}/ideas")
+                midi_dir.mkdir(parents=True, exist_ok=True)
+                safe_desc = re.sub(r'[^\w가-힣\s-]', '', desc)[:30].replace(' ', '_') or "idea"
+                midi_path = str(midi_dir / f"{safe_desc}.mid")
+                Path(midi_path).write_bytes(midi_bytes)
+            except Exception as e:
+                logger.error("아이디어 MIDI 저장 오류: %s", e)
+
+        # DB 저장
+        idea_id = db.save_idea(user_id, desc, tags=tags, midi_json=midi_json_str, midi_path=midi_path)
+
+        # 응답 전송
+        await _respond_with_midi(update, response)
+
+        if idea_id:
+            tag_str = " ".join(f"#{t}" for t in tags) if tags else "(태그 없음)"
+            await update.message.reply_text(
+                f"💾 아이디어 #{idea_id} 저장 완료!\n{tag_str}\n"
+                f"/library 로 모아보기 | /remix {idea_id} [스타일] 로 변형"
+            )
+
+
+def _extract_tags(text: str) -> list[str]:
+    """Claude 응답에서 '태그: #xxx #yyy' 형식의 태그를 추출."""
+    m = re.search(r"태그:\s*((?:#\S+\s*)+)", text)
+    if not m:
+        return ["미분류"]
+    raw = m.group(1)
+    tags = [t.lstrip("#").strip() for t in raw.split("#") if t.strip()]
+    return tags or ["미분류"]
+
+
+async def cmd_library(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """저장된 아이디어 목록 조회."""
+    if not update.effective_user:
+        return
+
+    ideas = db.get_ideas(update.effective_user.id, limit=20)
+    if not ideas:
+        await update.message.reply_text(
+            "📚 아직 저장된 아이디어가 없어요.\n/idea 비오는 날 피아노 루프 — 로 첫 영감을 기록해보세요!"
+        )
+        return
+
+    lines = ["📚 내 아이디어 라이브러리\n"]
+    for idea in ideas:
+        tags = " ".join(f"#{t}" for t in idea["tags"]) if idea["tags"] else ""
+        lines.append(f"  #{idea['id']}  {idea['description']}")
+        if tags:
+            lines.append(f"      {tags}")
+
+    lines.append(f"\n총 {len(ideas)}개 | /export [번호] 로 MIDI 다운 | /remix [번호] [스타일]")
+    await update.message.reply_text("\n".join(lines))
+
+
+async def cmd_export(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """저장된 아이디어의 MIDI 파일 재전송."""
+    if not update.effective_user or not update.message:
+        return
+
+    if not ctx.args:
+        await update.message.reply_text("사용법: /export [아이디어 번호]\n예: /export 1")
+        return
+
+    try:
+        idea_id = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("⚠️ 번호를 입력해주세요. 예: /export 1")
+        return
+
+    idea = db.get_idea_by_id(idea_id)
+    if not idea:
+        await update.message.reply_text(f"⚠️ #{idea_id} 아이디어를 찾을 수 없어요.")
+        return
+
+    # midi_path에서 파일 전송 시도
+    if idea["midi_path"] and Path(idea["midi_path"]).is_file():
+        midi_bytes = Path(idea["midi_path"]).read_bytes()
+        await update.message.reply_document(
+            document=io.BytesIO(midi_bytes),
+            filename=f"idea_{idea_id}.mid",
+            caption=f"💡 #{idea_id}: {idea['description']}",
+        )
+        # 오디오도 전송
+        try:
+            from audio import midi_to_audio
+            ogg = midi_to_audio(midi_bytes)
+            if ogg:
+                await update.message.reply_voice(voice=io.BytesIO(ogg))
+        except (ImportError, Exception):
+            pass
+    elif idea["midi_json"]:
+        # 파일이 없으면 midi_json에서 재생성
+        try:
+            data = json.loads(idea["midi_json"])
+            midi_bytes = generate_midi(data)
+            await update.message.reply_document(
+                document=io.BytesIO(midi_bytes),
+                filename=f"idea_{idea_id}.mid",
+                caption=f"💡 #{idea_id}: {idea['description']}",
+            )
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ MIDI 생성 실패: {e}")
+    else:
+        await update.message.reply_text(f"⚠️ #{idea_id}에 MIDI 데이터가 없어요.")
+
+
+async def cmd_remix(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """기존 아이디어를 다른 스타일로 변형."""
+    if not update.effective_user or not update.message:
+        return
+
+    if not ctx.args or len(ctx.args) < 2:
+        await update.message.reply_text(
+            "🔄 사용법: /remix [번호] [스타일]\n"
+            "예: /remix 1 재즈 스타일로\n"
+            "예: /remix 3 빠른 템포의 록"
+        )
+        return
+
+    try:
+        idea_id = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("⚠️ 첫 번째 인자는 아이디어 번호여야 해요.")
+        return
+
+    style = " ".join(ctx.args[1:])
+    idea = db.get_idea_by_id(idea_id)
+
+    if not idea:
+        await update.message.reply_text(f"⚠️ #{idea_id} 아이디어를 찾을 수 없어요.")
+        return
+
+    if not idea["midi_json"]:
+        await update.message.reply_text(f"⚠️ #{idea_id}에 MIDI 데이터가 없어서 리믹스할 수 없어요.")
+        return
+
+    user_id = update.effective_user.id
+    lock = _user_locks[user_id]
+    if lock.locked():
+        await update.message.reply_text("⏳ 이전 요청을 처리 중이에요.")
+        return
+
+    async with lock:
+        await update.message.reply_text(f"🔄 #{idea_id} 아이디어를 '{style}' 스타일로 변형 중...")
+
+        response = await ask_claude(
+            f"기존 MIDI 아이디어를 리믹스해줘.\n\n"
+            f"원본 설명: {idea['description']}\n"
+            f"원본 MIDI JSON:\n```midi-json\n{idea['midi_json']}\n```\n\n"
+            f"요청: 이 아이디어를 '{style}' 스타일로 변형해줘.\n"
+            "변형된 결과를 midi-json 블록으로 포함하고, 뭘 어떻게 바꿨는지 설명해줘."
+        )
+
+        # 리믹스 결과도 아이디어로 저장
+        midi_data = parse_midi_json(response)
+        if midi_data:
+            tags = _extract_tags(response)
+            tags.append("리믹스")
+            midi_json_str = json.dumps(midi_data, ensure_ascii=False)
+
+            midi_path = None
+            try:
+                midi_bytes = generate_midi(midi_data)
+                midi_dir = Path(f"data/midi/{user_id}/ideas")
+                midi_dir.mkdir(parents=True, exist_ok=True)
+                safe_style = re.sub(r'[^\w가-힣\s-]', '', style)[:20].replace(' ', '_') or "remix"
+                midi_path = str(midi_dir / f"remix_{idea_id}_{safe_style}.mid")
+                Path(midi_path).write_bytes(midi_bytes)
+            except Exception as e:
+                logger.error("리믹스 MIDI 저장 오류: %s", e)
+
+            new_id = db.save_idea(
+                user_id, f"리믹스 #{idea_id}: {style}",
+                tags=tags, midi_json=midi_json_str, midi_path=midi_path,
+            )
+            await _respond_with_midi(update, response)
+            if new_id:
+                await update.message.reply_text(f"💾 리믹스 결과가 아이디어 #{new_id}로 저장됨!")
+        else:
+            await _respond_with_midi(update, response)
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: /daily 음악 퀴즈
+# ---------------------------------------------------------------------------
+async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """매일 음악 퀴즈 구독 토글."""
+    if not update.effective_user or not update.message:
+        return
+    await update.message.reply_text(
+        "📝 /quiz 로 바로 음악 퀴즈를 풀 수 있어요!\n"
+        "(매일 자동 전송 기능은 준비 중입니다)"
+    )
+
+
+async def cmd_quiz(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """음악 이론 퀴즈 한 문제 출제."""
+    if not update.effective_user or not update.message:
+        return
+
+    user_id = update.effective_user.id
+    lock = _user_locks[user_id]
+    if lock.locked():
+        await update.message.reply_text("⏳ 이전 요청을 처리 중이에요.")
+        return
+
+    async with lock:
+        await update.message.reply_text("📝 퀴즈 생성 중...")
+        response = await ask_claude(
+            "음악 이론 퀴즈 한 문제를 내줘.\n\n"
+            "형식:\n"
+            "❓ [질문]\n"
+            "A) ...\nB) ...\nC) ...\nD) ...\n\n"
+            "정답과 해설은 '정답 보기'라고 하면 알려줄게.\n\n"
+            "난이도: 초급~중급. 코드, 스케일, 리듬, 음정, 곡 구조 중 랜덤."
+        )
+        await update.message.reply_text(response)
+
+
+# ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
 def main() -> None:
@@ -443,6 +711,12 @@ def main() -> None:
     app.add_handler(CommandHandler("chord", cmd_chord))
     app.add_handler(CommandHandler("midi", cmd_midi))
     app.add_handler(CommandHandler("theory", cmd_theory))
+    app.add_handler(CommandHandler("idea", cmd_idea))
+    app.add_handler(CommandHandler("library", cmd_library))
+    app.add_handler(CommandHandler("export", cmd_export))
+    app.add_handler(CommandHandler("remix", cmd_remix))
+    app.add_handler(CommandHandler("daily", cmd_daily))
+    app.add_handler(CommandHandler("quiz", cmd_quiz))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("폴링 시작... (대화 기억 활성, Claude CLI OAuth 사용)")
