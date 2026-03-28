@@ -64,7 +64,7 @@ I just called you, wanna see you
 시작하겠지
 
 계절 얘기로 돌리겠지
-네 얘기를 하고 싶은데
+네 안부를 묻고 싶은데
 
 [Outro]
 너를 봄이라고 부를게
