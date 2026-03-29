@@ -1,9 +1,12 @@
 # Suno 프롬프트
 
 ## 스타일 태그 (Style of Music)
-acoustic pop ballad, Korean, warm, bittersweet, spring, piano, strings, female vocal, mid-tempo 90bpm
+acoustic pop ballad, Korean, warm, bittersweet, spring, piano, acoustic guitar, guitar solo, strings, female vocal, mid-tempo 90bpm
 
 ## 가사 (Lyrics) — 아래를 Suno에 붙여넣기
+
+[Intro]
+[Guitar Solo]
 
 [Verse 1]
 자꾸 네 이름이 입에서 피어나
@@ -31,13 +34,13 @@ I wanna call you spring
 너를 다시 만날 수 있으니까
 
 [Verse 2]
-사실은 우리 눈 오던 날 끝났잖아
-코끝이 빨개진 게 추위 때문이라고
 둘 다 알면서 모른 척했던 밤
 택시 두 대가 반대로 꺾어진 골목
-
 그렇게 우리 처음 싸웠잖아
 그 길을 오늘도 그냥 지나쳐왔어
+
+사실은 우리 눈 오던 날 끝났잖아
+그날 네 목도리가 눈에 선명하잖아
 네가 없는 계절이 이렇게 밝으면
 좀 이상하잖아 혼자만 봄인 것 같아
 
@@ -76,3 +79,6 @@ I wanna call you spring
 I just called you, wanna see you
 너를 봄이라고 부르고 싶어서
 네가 보고 싶어서 전화했어
+
+[Outro]
+[Guitar Solo]
