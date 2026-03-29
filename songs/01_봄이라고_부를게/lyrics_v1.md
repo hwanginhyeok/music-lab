@@ -83,8 +83,8 @@ I just called you, wanna see you
 
 I wanna call you spring
 I just called you, wanna see you
+너를 봄이라고 부르고 싶어서
 네가 보고 싶어서 전화했어
-널 봄이라고 부르고 싶어서...
 
 ---
 
