@@ -45,13 +45,13 @@ I wanna call you spring
 
 [Verse 2]
 [Piano Lead, Guitar Drops]
-사실은 우리 눈 오던 날 끝났잖아
-코끝이 빨개진 게 추위 때문이라고
 둘 다 알면서 모른 척했던 밤
 택시 두 대가 반대로 꺾어진 골목
-
 그렇게 우리 처음 싸웠잖아
 그 길을 오늘도 그냥 지나쳐왔어
+
+사실은 우리 눈 오던 날 끝났잖아
+그날 네 목도리가 눈에 선명하잖아
 네가 없는 계절이 이렇게 밝으면
 좀 이상하잖아 혼자만 봄인 것 같아
 
@@ -93,8 +93,8 @@ I just called you, wanna see you
 
 I wanna call you spring
 I just called you, wanna see you
+너를 봄이라고 부르고 싶어서
 네가 보고 싶어서 전화했어
-널 봄이라고 부르고 싶어서... (봄이라고 부르고 싶어서)
 
 [Outro]
 [Guitar Fingerpicking Alone, Fade Out]

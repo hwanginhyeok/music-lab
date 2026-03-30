@@ -8,3 +8,10 @@ __pycache__/
 .env
 data/
 .pytest_cache/
+
+# YouTube OAuth
+client_secrets.json
+token.json
+
+# 영상 출력
+*.mp4
