@@ -42,4 +42,11 @@
 
 ## 완료
 
-(없음)
+| # | 작업 | 완료일 | 비고 |
+|---|------|--------|------|
+| N-0 | manifest.json 지원 (jazz_pipeline.py) | 2026-03-30 | 파이프라인 실행 시 곡 메타데이터 자동 생성 |
+| N-1 | scripts/create_video.py | 2026-03-30 | ffmpeg로 이미지+오디오 -> MP4 영상 |
+| N-2 | scripts/generate_thumbnail.py | 2026-03-30 | Pillow로 YouTube 썸네일 자동 생성 |
+| N-3 | scripts/youtube_upload.py | 2026-03-30 | YouTube Data API v3 업로드 |
+| N-4 | scripts/publish.py | 2026-03-30 | YouTube 게시 오케스트레이터 |
+| N-5 | 클래식 재즈 프리셋 추가 | 2026-03-30 | jazz bar, bebop, vocal jazz standards 추가 / neo soul jazz 제거 |

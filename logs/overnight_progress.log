@@ -1,0 +1,14 @@
+[야간작업] 09:10 턴 완료 — 52af765 refactor: Suno 원스택 전환 — 후처리 파이프라인 + MIDI 데모 삭제
+[야간작업] 13:27 턴 완료 — 52af765 refactor: Suno 원스택 전환 — 후처리 파이프라인 + MIDI 데모 삭제
+[야간작업] 13:28 턴 완료 — 52af765 refactor: Suno 원스택 전환 — 후처리 파이프라인 + MIDI 데모 삭제
+[야간작업] 14:04 턴 완료 — 52af765 refactor: Suno 원스택 전환 — 후처리 파이프라인 + MIDI 데모 삭제
+[야간작업] 14:05 턴 완료 — 52af765 refactor: Suno 원스택 전환 — 후처리 파이프라인 + MIDI 데모 삭제
+[야간작업] 15:34 턴 완료 — 52af765 refactor: Suno 원스택 전환 — 후처리 파이프라인 + MIDI 데모 삭제
+[야간작업] 15:36 턴 완료 — e2a25c1 feat: jazz_pipeline.py에 manifest.json 자동 생성 추가
+[야간작업] 15:36 작업 0 완료 — e2a25c1 manifest.json 지원 (jazz_pipeline.py 수정)
+[야간작업] 15:37 작업 1 완료 — 08cb4d8 create_video.py 추가
+[야간작업] 15:38 작업 2 완료 — 80a152c generate_thumbnail.py 추가
+[야간작업] 15:39 작업 3 완료 — ae4561a youtube_upload.py 추가
+[야간작업] 15:40 작업 4 완료 — 1e8154c publish.py 오케스트레이터 추가
+[야간작업] 15:41 작업 5 완료 — 3f2edc1 클래식 재즈 프리셋 추가 (jazz bar, bebop, vocal jazz standards)
+[야간작업] 15:42 전체 완료 — 6/6 작업 성공, 브리핑 생성, tonight_prompt 이름 변경

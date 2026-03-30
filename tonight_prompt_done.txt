@@ -1,0 +1,113 @@
+# Music Lab 야간작업 — Suno → YouTube 자동화 파이프라인 구축
+
+## 작업 목표
+재즈 파이프라인으로 생성한 곡을 YouTube에 자동 게시하는 스크립트 4개 + 오케스트레이터 1개 구축.
+Suno 생성과 스템 다운로드만 수동, 나머지는 전부 자동화.
+
+## 전체 파이프라인 흐름
+```
+songs/NN_곡이름/
+  ├── release/final.wav          ← mix_stems.py 출력 (이미 있음)
+  ├── cover.jpg                  ← 사용자 준비 또는 썸네일 스크립트로 생성
+  ├── video/output.mp4           ← create_video.py가 생성
+  └── video/thumbnail.jpg        ← generate_thumbnail.py가 생성
+                                      ↓
+                              youtube_upload.py로 업로드
+                                      ↓
+                              publish.py가 전체 오케스트레이션
+```
+
+## 작업 항목
+
+### 0. manifest.json 지원 (jazz_pipeline.py 수정)
+- jazz_pipeline.py 실행 시 곡 디렉토리에 manifest.json 자동 생성
+- 포맷:
+```json
+{
+  "title": "곡 제목",
+  "subgenre": "jazz bar",
+  "theme": "도시의 밤",
+  "status": "generated",
+  "scheduled_date": null,
+  "youtube_id": null,
+  "created_at": "2026-03-30T14:00:00Z"
+}
+```
+- status 흐름: generated → mixed → video_ready → published
+- publish.py가 manifest.json의 scheduled_date 기준 FIFO로 곡 선택
+- mix_stems.py 완료 후 status를 "mixed"로 업데이트하는 로직은 batch_mix.py에 포함
+
+### 1. scripts/create_video.py
+- ffmpeg subprocess로 이미지 + 오디오 → MP4 영상 생성
+- 입력: cover.jpg (또는 기본 배경) + release/final.wav
+- 출력: video/output.mp4
+- 해상도: 1920x1080, H.264, AAC 192k
+- 옵션: --image (커버 이미지), --audio (오디오 파일), --output (출력 경로)
+- ffmpeg 미설치 시 에러 메시지
+- 이미지 없으면 기본 검정 배경 + 곡 제목 텍스트 (ffmpeg drawtext)
+- 예: python3 scripts/create_video.py songs/01_봄이라고_부를게/
+
+### 2. scripts/generate_thumbnail.py
+- Pillow로 YouTube 썸네일 자동 생성
+- 입력: 배경 이미지 (또는 기본 그라데이션) + 곡 제목 + 장르 태그
+- 출력: video/thumbnail.jpg (1280x720, JPEG)
+- 스타일: 어두운 배경 + 큰 한글 제목 + 작은 영문 서브타이틀 + 장르 태그
+- 폰트: 시스템 기본 폰트 사용 (NanumGothic 또는 fallback)
+- 예: python3 scripts/generate_thumbnail.py songs/01_봄이라고_부를게/ --title "봄이라고 부를게" --subtitle "Korean Indie Pop"
+
+### 3. scripts/youtube_upload.py
+- google-api-python-client로 YouTube Data API v3 업로드
+- OAuth2 인증: client_secrets.json → 최초 브라우저 인증 → token.json 저장 → 이후 자동 갱신
+- 입력: video/output.mp4, video/thumbnail.jpg, 메타데이터 (제목/설명/태그)
+- 메타데이터: concept.md에서 자동 추출 또는 --title, --description, --tags 옵션
+- 카테고리: 10 (Music)
+- 기본 privacyStatus: unlisted (안전하게 시작, 사용자가 public으로 변경)
+- AI 콘텐츠 공개 관련 설명문 자동 삽입 (설명란에)
+- 업로드 완료 시 video URL 출력
+- client_secrets.json 없으면 설정 안내 메시지 출력
+- 필요 패키지: google-api-python-client google-auth-httplib2 google-auth-oauthlib
+- 예: python3 scripts/youtube_upload.py songs/01_봄이라고_부를게/ --title "봄이라고 부를게" --public
+
+### 4. scripts/publish.py (오케스트레이터)
+- 곡 디렉토리 하나를 받아서 전체 파이프라인 실행:
+  1. release/final.wav 존재 확인
+  2. generate_thumbnail.py 실행 → thumbnail.jpg 생성
+  3. create_video.py 실행 → output.mp4 생성
+  4. youtube_upload.py 실행 → YouTube 업로드
+  5. 결과 요약 출력 (URL, 파일 크기, 영상 길이)
+- --skip-upload 옵션: 영상까지만 만들고 업로드 안 함
+- --public 옵션: 바로 공개 (기본은 unlisted)
+- concept.md에서 제목/설명/태그 자동 추출 로직 포함
+- 예: python3 scripts/publish.py songs/01_봄이라고_부를게/
+- 예: python3 scripts/publish.py songs/01_봄이라고_부를게/ --skip-upload
+
+### 5. 클래식 재즈 프리셋 추가 (jazz_pipeline.py 수정)
+- 현재 서브장르에서 제거: neo soul jazz
+- 현재 서브장르에서 유지: smooth jazz, jazz ballad, bossa nova, cool jazz, swing
+- 새로 추가할 클래식 서브장르:
+  - "jazz bar" — 재즈바 감성. 피아노 트리오 (피아노+업라이트 베이스+브러시 드럼). BPM 70-90. Chet Baker, Bill Evans 스타일. YouTube "재즈바에서 듣는 밤" 컨셉에 최적
+  - "bebop" — Charlie Parker, Dizzy Gillespie. BPM 160-220. 빠른 즉흥, 알토 색소폰 + 트럼펫
+  - "vocal jazz standards" — Ella Fitzgerald, Billie Holiday 느낌. 스탠다드 감성. 따뜻한 보컬 + 피아노 + 업라이트 베이스
+- jazz fusion은 유지 (YouTube에서도 수요 있음)
+
+## 코딩 규칙
+- 변수/함수명 영어, 주석/커밋 한국어
+- 각 스크립트는 독립 실행 가능 (argparse CLI)
+- 외부 패키지 설치 필요 시 requirements.txt에 추가하지 말고 스크립트 내에서 import 실패 시 설치 안내 메시지 출력
+- ffmpeg는 시스템 패키지 (subprocess 호출)
+- client_secrets.json, token.json은 .gitignore에 추가
+- 각 작업 완료 시 커밋
+
+## 금지 사항
+- git push 금지
+- .env 수정 금지
+- 패키지 의존성 추가/제거 금지 (import 실패 시 안내만)
+- 비공식 Suno API 사용 금지 (ToS 위반)
+
+## 완료 기준
+- scripts/create_video.py: ffmpeg 없이도 문법 통과, --help 동작
+- scripts/generate_thumbnail.py: Pillow 없어도 문법 통과, --help 동작
+- scripts/youtube_upload.py: google-api 없어도 문법 통과, --help 동작, client_secrets.json 없으면 설정 안내
+- scripts/publish.py: 서브스크립트 호출 체인 동작
+- jazz_pipeline.py: 클래식 프리셋 추가 + dry-run 통과
+- docs/프로젝트/overnight_brief_20260329.md 브리핑 파일 생성
