@@ -96,15 +96,35 @@ JAZZ_PRESETS: dict[str, dict] = {
         "vocal_style": "charismatic vocal, swing phrasing, rhythmic syncopation, crooner style",
         "reference": "Frank Sinatra, Ella Fitzgerald, Count Basie",
     },
-    "neo soul jazz": {
-        "bpm": "85-105",
-        "key": "Ab Major / Eb minor",
-        "instruments": "로즈 피아노, 일렉 베이스, 드럼 (하이햇 ghost), 신스 패드, 색소폰",
-        "feel": "따뜻하고 그루비한, R&B 감성, 힙합 비트",
-        "progressions": "IΔ9 → iv7 → bVII9 → IΔ9, ii9 → V13 → IΔ9",
-        "suno_style": "neo soul jazz, Rhodes piano, electric bass, ghost note drums, synth pad, saxophone, warm groovy, R&B jazz, lo-fi",
-        "vocal_style": "soulful warm vocal, R&B jazz phrasing, gentle runs, breathy intimate",
-        "reference": "Robert Glasper, Erykah Badu, D'Angelo, Tom Misch",
+    "jazz bar": {
+        "bpm": "70-90",
+        "key": "Eb Major / Ab Major",
+        "instruments": "어쿠스틱 피아노 (트리오), 업라이트 베이스, 브러시 드럼",
+        "feel": "재즈바 감성, 따뜻한 조명, 위스키 한 잔, 친밀한",
+        "progressions": "IΔ7 → vi7 → ii7 → V7, iii7 → vi7 → ii7 → V7alt",
+        "suno_style": "jazz bar, piano trio, acoustic piano, upright bass, brush drums, intimate, warm, late night, whiskey mood",
+        "vocal_style": "warm intimate vocal, gentle crooner, soft jazz phrasing, breathy close-mic",
+        "reference": "Chet Baker, Bill Evans, Keith Jarrett",
+    },
+    "bebop": {
+        "bpm": "160-220",
+        "key": "Bb Major / F Major",
+        "instruments": "알토 색소폰, 트럼펫, 피아노, 업라이트 베이스, 드럼 (라이드 심벌)",
+        "feel": "빠르고 정교한, 즉흥 연주, 기교적, 에너지",
+        "progressions": "ii7 → V7 → IΔ7, I → vi7 → ii7 → V7, rhythm changes",
+        "suno_style": "bebop jazz, alto saxophone, trumpet, fast piano, upright bass, ride cymbal, virtuosic, improvisation, energetic",
+        "vocal_style": "fast scat vocal, bebop phrasing, rhythmic precision, playful articulation",
+        "reference": "Charlie Parker, Dizzy Gillespie, Thelonious Monk",
+    },
+    "vocal jazz standards": {
+        "bpm": "80-110",
+        "key": "F Major / Db Major",
+        "instruments": "어쿠스틱 피아노, 업라이트 베이스, 브러시 드럼, 뮤트 트럼펫",
+        "feel": "따뜻하고 클래식한, 스탠다드 감성, 빈티지, 로맨틱",
+        "progressions": "IΔ7 → vi7 → ii7 → V7, I → I7 → IV → iv → I",
+        "suno_style": "vocal jazz standards, warm vocal, acoustic piano, upright bass, brush drums, muted trumpet, vintage, romantic, classic jazz",
+        "vocal_style": "warm rich vocal, classic jazz phrasing, gentle vibrato, storytelling tone",
+        "reference": "Ella Fitzgerald, Billie Holiday, Frank Sinatra, Nat King Cole",
     },
 }
 
@@ -735,7 +755,9 @@ def _get_jazz_mix_levels(subgenre: str) -> dict[str, float]:
         "cool jazz": {"Keyboard": 0.60, "Other": 0.55, "Drums": 0.50, "Bass": 0.55},
         "jazz fusion": {"Guitar": 0.60, "Bass": 0.60, "Drums": 0.60, "Keyboard": 0.55, "Synth": 0.35},
         "swing": {"Other": 0.60, "Drums": 0.55, "Bass": 0.55, "Keyboard": 0.55},
-        "neo soul jazz": {"Keyboard": 0.65, "Bass": 0.60, "Drums": 0.55, "Other": 0.45, "Synth": 0.35},
+        "jazz bar": {"Keyboard": 0.70, "Bass": 0.55, "Drums": 0.40, "Other": 0.35, "Guitar": 0.30},
+        "bebop": {"Other": 0.60, "Drums": 0.55, "Bass": 0.55, "Keyboard": 0.55, "Guitar": 0.35},
+        "vocal jazz standards": {"Keyboard": 0.65, "Bass": 0.50, "Drums": 0.40, "Other": 0.50, "Guitar": 0.35},
     }
 
     if subgenre in adjustments:
@@ -764,7 +786,7 @@ def interactive_select_subgenre() -> str:
 
     while True:
         try:
-            choice = input("번호 입력 (1-7): ").strip()
+            choice = input(f"번호 입력 (1-{len(names)}): ").strip()
             idx = int(choice) - 1
             if 0 <= idx < len(names):
                 selected = names[idx]
@@ -772,7 +794,7 @@ def interactive_select_subgenre() -> str:
                 return selected
         except (ValueError, EOFError):
             pass
-        print("  1-7 사이 숫자를 입력하세요.")
+        print(f"  1-{len(names)} 사이 숫자를 입력하세요.")
 
 
 def main():
