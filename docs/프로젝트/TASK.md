@@ -50,3 +50,10 @@
 | N-3 | scripts/youtube_upload.py | 2026-03-30 | YouTube Data API v3 업로드 |
 | N-4 | scripts/publish.py | 2026-03-30 | YouTube 게시 오케스트레이터 |
 | N-5 | 클래식 재즈 프리셋 추가 | 2026-03-30 | jazz bar, bebop, vocal jazz standards 추가 / neo soul jazz 제거 |
+| N-6 | 워크플로우 템플릿 세트 | 2026-03-30 | songs/template/ + workflow_guide.md |
+| N-7 | Suno 프롬프트 v3 + 영어/한국어 contemporary pop | 2026-03-30 | lo-fi 금지, indie band + emotional dreamy 검증 |
+| N-8 | 영어 번안 가사 "I'll Call You Spring" | 2026-03-30 | 언어유희 보존 (call=name/phone, spring=season) |
+| N-9 | Suno 다운로드 파이프라인 (suno_download.py) | 2026-03-31 | Clerk JWT → studio-api-prod.suno.com API 직접 호출 |
+| N-10 | YouTube 업로드 파이프라인 end-to-end | 2026-03-31 | 곡 다운로드 → MP4 변환 → YouTube 업로드 성공 |
+| N-11 | lyrics_v2.md 삭제 | 2026-03-31 | lyrics_v1.md가 최종 확정본 |
+| N-12 | Suno 원스택 전환 — 후처리 파이프라인 삭제 | 2026-03-29 | mix_stems.py, process.py, MIDI 데모 제거 |
