@@ -79,9 +79,16 @@ def get_credentials() -> Credentials | None:
                 print_setup_guide()
                 return None
 
-            print("  브라우저에서 Google 인증을 진행합니다...")
             flow = InstalledAppFlow.from_client_secrets_file(str(secrets_path), SCOPES)
-            creds = flow.run_local_server(port=0)
+            try:
+                creds = flow.run_local_server(port=0)
+            except Exception:
+                # 원격 환경 등 브라우저 팝업 불가 시 URL 복사 방식
+                auth_url, _ = flow.authorization_url(prompt="consent")
+                print(f"\n  아래 URL을 브라우저에서 열고 인증하세요:\n\n  {auth_url}\n")
+                code = input("  인증 후 표시되는 코드를 붙여넣으세요: ").strip()
+                flow.fetch_token(code=code)
+                creds = flow.credentials
 
         # 토큰 저장
         token_path.write_text(creds.to_json(), encoding="utf-8")

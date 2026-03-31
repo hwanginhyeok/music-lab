@@ -1,0 +1,8 @@
+python-telegram-bot==22.7
+midiutil
+python-dotenv==1.2.2
+requests==2.31.0
+google-api-python-client==2.193
+google-auth
+undetected-chromedriver
+selenium

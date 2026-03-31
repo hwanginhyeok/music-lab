@@ -693,6 +693,130 @@ async def cmd_quiz(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Suno AI 곡 생성
+# ---------------------------------------------------------------------------
+
+async def cmd_suno(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Suno AI로 곡 생성. /suno <프롬프트파일명>"""
+    user_id = update.effective_user.id
+    text = (update.message.text or "").replace("/suno", "").strip()
+
+    if not text:
+        await update.message.reply_text(
+            "사용법:\n"
+            "/suno <프롬프트 파일명>\n"
+            "예: /suno suno_prompt_final\n\n"
+            "songs/ 폴더의 프롬프트 파일에서 Style + Lyrics를 읽어 Suno에 전달합니다."
+        )
+        return
+
+    # 프롬프트 파일 찾기
+    from pathlib import Path as _Path
+    prompt_path = None
+    for song_dir in sorted(_Path("songs").iterdir()):
+        if not song_dir.is_dir() or song_dir.name == "template":
+            continue
+        for f in song_dir.iterdir():
+            if text in f.stem and f.suffix == ".md":
+                prompt_path = f
+                break
+        if prompt_path:
+            break
+
+    if not prompt_path:
+        await update.message.reply_text(f"프롬프트 파일을 찾을 수 없습니다: {text}")
+        return
+
+    from suno_pipeline import parse_prompt_file
+    try:
+        style, lyrics = parse_prompt_file(str(prompt_path))
+    except Exception as e:
+        await update.message.reply_text(f"프롬프트 파싱 실패: {e}")
+        return
+
+    if not style or not lyrics:
+        await update.message.reply_text("Style 또는 Lyrics가 비어있습니다.")
+        return
+
+    title = prompt_path.parent.name.replace("_", " ")
+    msg = await update.message.reply_text(
+        f"🎵 Suno 곡 생성 중: {title}\n"
+        f"Style: {style[:60]}...\n"
+        f"⏳ 2~5분 소요됩니다..."
+    )
+
+    loop = asyncio.get_event_loop()
+
+    try:
+        from suno_client import SunoClient, SunoError
+
+        def _generate():
+            client = SunoClient()
+            try:
+                song_urls = client.generate(lyrics=lyrics, style=style, title=title)
+                song_id = song_urls[0].rstrip("/").split("/")[-1]
+                db.save_suno_song(user_id, title, song_id, style, lyrics)
+
+                path = client.download(song_urls[0])
+                drive_url = ""
+                try:
+                    from drive_uploader import DriveUploader
+                    uploader = DriveUploader()
+                    drive_url = uploader.upload(str(path))
+                except Exception:
+                    pass
+                db.update_suno_status(
+                    song_id, "complete",
+                    local_path=str(path),
+                    drive_url=drive_url,
+                )
+                return song_id, path, drive_url, len(song_urls)
+            finally:
+                client.close()
+
+        song_id, path, drive_url, num_songs = await loop.run_in_executor(None, _generate)
+
+        result_text = f"✅ 곡 생성 완료!\n🎵 {title} ({num_songs}곡)"
+        if drive_url:
+            result_text += f"\n☁️ {drive_url}"
+
+        await msg.edit_text(result_text)
+
+        with open(path, "rb") as audio_file:
+            await update.message.reply_audio(
+                audio=audio_file,
+                title=title,
+                performer="Suno AI",
+            )
+
+    except Exception as e:
+        logger.error("Suno 파이프라인 오류: %s", e, exc_info=True)
+        await msg.edit_text(f"❌ Suno 생성 실패: {e}")
+
+
+async def cmd_suno_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """생성한 Suno 곡 목록."""
+    user_id = update.effective_user.id
+    songs = db.get_suno_songs(user_id)
+
+    if not songs:
+        await update.message.reply_text("아직 생성한 곡이 없습니다. /suno로 시작해보세요!")
+        return
+
+    lines = ["🎵 내 Suno 곡 목록\n"]
+    for s in songs:
+        status_icon = "✅" if s["status"] == "complete" else "⏳" if s["status"] == "pending" else "❌"
+        line = f"{status_icon} {s['title']}"
+        if s.get("duration_sec"):
+            line += f" ({s['duration_sec']:.0f}초)"
+        if s.get("drive_url"):
+            line += f"\n   ☁️ {s['drive_url']}"
+        lines.append(line)
+
+    await update.message.reply_text("\n".join(lines))
+
+
+# ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
 def main() -> None:
@@ -717,6 +841,8 @@ def main() -> None:
     app.add_handler(CommandHandler("remix", cmd_remix))
     app.add_handler(CommandHandler("daily", cmd_daily))
     app.add_handler(CommandHandler("quiz", cmd_quiz))
+    app.add_handler(CommandHandler("suno", cmd_suno))
+    app.add_handler(CommandHandler("suno_list", cmd_suno_list))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("폴링 시작... (대화 기억 활성, Claude CLI OAuth 사용)")
