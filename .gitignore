@@ -8,6 +8,7 @@ __pycache__/
 .env
 data/
 .pytest_cache/
+logs/
 
 # YouTube OAuth
 client_secrets.json
@@ -15,3 +16,6 @@ token.json
 
 # 영상 출력
 *.mp4
+
+# Suno 관련
+*.deb
