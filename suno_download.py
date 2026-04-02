@@ -131,7 +131,32 @@ class SunoAPI:
         resp.raise_for_status()
         path.write_bytes(resp.content)
         print(f"  ✅ {path} ({len(resp.content) / 1024 / 1024:.1f}MB)")
+
+        # 커버 이미지 다운로드
+        self.download_cover(song, output_dir)
+
         return path
+
+    def download_cover(self, song: dict, output_dir: Path = SUNO_DIR) -> Path | None:
+        """Suno AI 생성 커버 이미지 다운로드."""
+        image_url = song.get("image_large_url") or song.get("image_url")
+        if not image_url:
+            return None
+
+        song_id = song.get("id", "unknown")
+        title = song.get("title", "").strip() or song_id
+        safe_title = "".join(c for c in title if c.isalnum() or c in " ._-").strip()
+        cover_path = output_dir / f"{safe_title}_{song_id[:8]}_cover.jpeg"
+
+        if cover_path.exists():
+            return cover_path
+
+        resp = requests.get(image_url, timeout=30)
+        if resp.status_code == 200:
+            cover_path.write_bytes(resp.content)
+            print(f"  🎨 커버: {cover_path}")
+            return cover_path
+        return None
 
 
 def cmd_list(api: SunoAPI):
@@ -232,19 +257,40 @@ def upload_to_youtube(song: dict, audio_path: Path):
     tags = [t.strip() for t in tags_str.split(",") if t.strip()]
     tags.extend(["AI Music", "Suno", "AI Generated"])
 
-    # YouTube는 오디오 파일 직접 업로드 불가 → ffmpeg로 MP4 변환
-    import subprocess
+    # 영상 생성 (Ken Burns 효과 + 가사 자막)
     mp4_path = audio_path.with_suffix(".mp4")
     if not mp4_path.exists():
-        print("  🔄 MP4 변환 중...")
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-f", "lavfi", "-i", "color=c=black:s=1920x1080:r=1",
-            "-i", str(audio_path),
-            "-shortest", "-c:v", "libx264", "-tune", "stillimage",
-            "-c:a", "aac", "-b:a", "192k",
-            str(mp4_path),
-        ], capture_output=True, timeout=120)
+        cover_path = audio_path.with_name(audio_path.stem + "_cover.jpeg")
+        lyrics_text = song.get("metadata", {}).get("prompt", "")
+
+        # 가사 → SRT 자막 생성
+        srt_path = None
+        if lyrics_text:
+            scripts_dir = str(Path(__file__).parent / "scripts")
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            from lyrics_to_srt import generate_srt
+            from create_video import get_audio_duration
+            duration = get_audio_duration(audio_path)
+            if duration > 0:
+                srt_path = audio_path.with_suffix(".srt")
+                generate_srt(lyrics_text, duration, srt_path)
+
+        # create_video로 영상 생성
+        scripts_dir = str(Path(__file__).parent / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        from create_video import create_video
+        song_title = song.get("title", "Untitled")
+        print("  🎬 영상 생성 (Ken Burns + 자막)...")
+        create_video(
+            image_path=cover_path if cover_path.exists() else Path("nonexistent"),
+            audio_path=audio_path,
+            output_path=mp4_path,
+            title=song_title,
+            ken_burns=cover_path.exists(),
+            lyrics_srt=srt_path,
+        )
 
     media = MediaFileUpload(str(mp4_path), mimetype="video/mp4", resumable=True)
 
@@ -278,6 +324,18 @@ def upload_to_youtube(song: dict, audio_path: Path):
         url = f"https://youtube.com/watch?v={video_id}"
         print(f"  ✅ {url}")
         db.update_suno_status(song.get("id", ""), "complete", drive_url=url)
+
+        # 썸네일 설정
+        cover_path = audio_path.with_name(audio_path.stem + "_cover.jpeg")
+        if cover_path.exists():
+            try:
+                youtube.thumbnails().set(
+                    videoId=video_id,
+                    media_body=MediaFileUpload(str(cover_path), mimetype="image/jpeg"),
+                ).execute()
+                print(f"  🎨 썸네일 설정 완료")
+            except Exception as e:
+                print(f"  ⚠️  썸네일 설정 실패: {e}")
     else:
         print("  ❌ 업로드 실패")
 

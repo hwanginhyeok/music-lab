@@ -19,3 +19,4 @@ token.json
 
 # Suno 관련
 *.deb
+.gstack/

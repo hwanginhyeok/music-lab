@@ -112,6 +112,8 @@ def create_video(
     audio_path: Path,
     output_path: Path,
     title: str = "",
+    ken_burns: bool = True,
+    lyrics_srt: Path | None = None,
 ) -> bool:
     """정지 이미지 + 오디오 -> MP4 영상 생성.
 
@@ -120,6 +122,8 @@ def create_video(
         audio_path: 오디오 파일 경로 (WAV/MP3)
         output_path: 출력 MP4 경로
         title: 곡 제목 (검정 배경 시 텍스트 표시용)
+        ken_burns: Ken Burns 줌 효과 적용 여부
+        lyrics_srt: 가사 자막 SRT 파일 경로
 
     Returns:
         성공 여부
@@ -136,23 +140,82 @@ def create_video(
         # 출력 디렉토리 생성
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # ffmpeg 명령어: 이미지를 루프 + 오디오 길이만큼 영상 생성
-        cmd = [
-            "ffmpeg", "-y",
-            "-loop", "1",
-            "-i", str(actual_image),
-            "-i", str(audio_path),
-            "-c:v", "libx264",
-            "-tune", "stillimage",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-pix_fmt", "yuv420p",
-            "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
-            "-shortest",
-            str(output_path),
-        ]
+        duration = get_audio_duration(audio_path)
 
-        print(f"  ffmpeg 실행 중...")
+        if ken_burns and actual_image != temp_bg:
+            # Ken Burns 효과: zoompan 필터로 천천히 줌인
+            # 이미지를 먼저 고해상도로 업스케일 (zoompan용)
+            total_frames = int(duration * 30) if duration > 0 else 9000  # 30fps
+
+            vf_parts = []
+            # zoompan: 천천히 줌인 (1.0 → 1.2, 20% 줌)
+            vf_parts.append(
+                f"scale=3840:-1,"
+                f"zoompan=z='min(zoom+0.0003,1.2)'"
+                f":x='iw/2-(iw/zoom/2)'"
+                f":y='ih/2-(ih/zoom/2)'"
+                f":d={total_frames}"
+                f":s=1920x1080"
+                f":fps=30"
+            )
+
+            # 자막 추가 (있으면)
+            if lyrics_srt and lyrics_srt.is_file():
+                # subtitles 필터 경로에서 : \ 이스케이프
+                srt_escaped = str(lyrics_srt).replace("\\", "/").replace(":", "\\:")
+                vf_parts.append(
+                    f"subtitles='{srt_escaped}'"
+                    f":force_style='FontSize=28,PrimaryColour=&HFFFFFF&"
+                    f",OutlineColour=&H000000&,BorderStyle=3,Outline=2"
+                    f",Alignment=2,MarginV=60'"
+                )
+
+            vf = ",".join(vf_parts)
+
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", str(actual_image),
+                "-i", str(audio_path),
+                "-c:v", "libx264",
+                "-preset", "medium",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-pix_fmt", "yuv420p",
+                "-vf", vf,
+                "-shortest",
+                str(output_path),
+            ]
+            print(f"  ffmpeg 실행 중 (Ken Burns + 자막)...")
+        else:
+            # 기존 방식: 정지 이미지
+            vf = "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2"
+
+            # 자막 추가 (있으면)
+            if lyrics_srt and lyrics_srt.is_file():
+                srt_escaped = str(lyrics_srt).replace("\\", "/").replace(":", "\\:")
+                vf += (
+                    f",subtitles='{srt_escaped}'"
+                    f":force_style='FontSize=28,PrimaryColour=&HFFFFFF&"
+                    f",OutlineColour=&H000000&,BorderStyle=3,Outline=2"
+                    f",Alignment=2,MarginV=60'"
+                )
+
+            cmd = [
+                "ffmpeg", "-y",
+                "-loop", "1",
+                "-i", str(actual_image),
+                "-i", str(audio_path),
+                "-c:v", "libx264",
+                "-tune", "stillimage",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-pix_fmt", "yuv420p",
+                "-vf", vf,
+                "-shortest",
+                str(output_path),
+            ]
+            print(f"  ffmpeg 실행 중...")
+
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
         if result.returncode != 0:
