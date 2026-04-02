@@ -252,7 +252,9 @@ class SunoClient:
         driver = self._get_driver()
         logger.info("Suno 곡 생성 시작: %s", title or "무제")
 
-        # Create 페이지 접속
+        # 페이지 상태 초기화 — 다른 페이지 갔다가 Create로 복귀
+        driver.get("https://suno.com/explore")
+        time.sleep(3)
         driver.get("https://suno.com/create")
         time.sleep(5)
 

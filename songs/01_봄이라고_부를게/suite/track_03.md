@@ -4,13 +4,30 @@
 
 ---
 
+## 장르: Swing Jazz
+
+1930~40년대 빅밴드 시대에서 온 스타일. 리듬이 "쿵짝쿵짝"이 아니라 "쿵~짝 쿵~짝" 하고 뒤로 끌린다 — 이게 스윙감.
+특징: 발이 저절로 움직임. 재즈 중에서 가장 신체적이고 에너지 있는 스타일.
+
+### 이 트랙에서 쓴 태그
+| 태그 | 들을 때 포인트 |
+|------|---------------|
+| `swing` | 리듬이 직선이 아니라 출렁임. 비트가 뒤로 살짝 밀리는 느낌 |
+| `upbeat` | 밝고 에너지 있는. 듣는 사람 기분 올려주는 |
+| `playful` | 장난스러운 느낌. 악기가 서로 놀리듯 주고받음 |
+| `walking bass` | 베이스가 한 음씩 "걸어다니듯" 꾸준히 움직임. 쿵-쿵-쿵-쿵 |
+| `brush drums` | 여전히 브러시. 스윙이지만 공격적이지 않게 |
+| `120bpm` | Medium Swing 템포. 여유 있게 흔들리는 속도 |
+
+---
+
 ## 감정
 
 순수한 즐거움. 아직 그리움의 그림자가 없다. 봄이 주는 에너지 그 자체.
 
 ## Style of Music
 ```
-swing jazz, upbeat, playful, Rhodes electric piano, upright bass, brush drums, walking bass, warm, spring mood, bright, 140bpm
+swing jazz, upbeat, playful, Rhodes electric piano, upright bass, brush drums, walking bass, warm, spring mood, bright, 120bpm
 ```
 
 ## Lyrics (Suno 형식)

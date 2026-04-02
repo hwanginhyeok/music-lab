@@ -1,45 +1,86 @@
-# Track 05 — 숨을 고르는
+# Track 05 — 숨을 참는
 
-> 폭풍 전 고요. 피아노와 베이스 둘만 남는다. Suite에서 가장 조용한 트랙이자 Track 6 폭발 직전의 정적.
+> 폭발 직전의 긴장. Track 4에서 색소폰이 끌어올린 감정을 내리지 않고 가둔다. 숨을 고르는 게 아니라 — 숨을 참는다.
+
+---
+
+## 장르: Jazz Tension (오스티나토 기반)
+
+특정 장르명이라기보다 기법. **오스티나토** = 같은 짧은 패턴을 계속 반복하는 것.
+클래식의 "볼레로"(라벨)가 대표적 — 같은 리듬이 15분간 반복되면서 점점 커진다.
+재즈에서는 베이스가 짧은 리프를 루프처럼 돌리면서 위에서 다른 악기가 쌓이는 방식으로 긴장을 만든다.
+
+### 이 트랙에서 쓴 태그
+| 태그 | 들을 때 포인트 |
+|------|---------------|
+| `ostinato` | 베이스가 같은 2~4음 패턴을 계속 반복. 심장박동처럼 멈추지 않음 |
+| `tense` | 편안하지 않은 화성. 불협화음까지는 아닌데 "해결 안 된" 느낌 |
+| `suspenseful` | 뭔가 일어날 것 같은 기대감. 영화에서 문 열기 직전 |
+| `minimal` | 악기 수가 적음. 소리가 비어있는데 그 빈 공간이 긴장감 |
+| `brush drums` | 최소한의 맥박 유지. 없으면 에너지가 바닥까지 떨어지니까 |
+| `88bpm` | Track 4(95)에서 살짝만 내린 속도. 급감속 아닌 자연스러운 감속 |
 
 ---
 
 ## 감정
 
-자각 직전의 멈춤. 설렘이라고 믿었던 감정의 정체를 마주하기 직전. 심장이 한 박자 멈추는 순간.
+자각 직전의 압축. 설렘이라고 믿었던 감정의 정체를 마주하기 직전. 심장이 한 박자 멈추는 게 아니라 **빨라지는** 순간.
 
 ## Style of Music
 ```
-jazz duo, piano, upright bass, minimal, intimate, contemplative, quiet, warm, spring mood, sparse, 70bpm
+jazz, piano, upright bass, brush drums, tense, suspenseful, minimal, warm, spring mood, ostinato, 88bpm
 ```
 
 ## Lyrics (Suno 형식)
 
 ```
 [Instrumental Intro]
-[Piano Alone, Sparse]
+[Bass Ostinato, Heartbeat Rhythm]
 
-[Duo]
-[Bass Enters, Arco]
-
-[Conversation]
-[Piano and Bass Trading Phrases]
-
-[Stillness]
-[Long Notes, Space]
+[Main Section]
+[Piano Repeating Chords, Tension]
+[Brush Drums, Minimal Pulse]
 
 [Build]
-[Tension Rising Slowly]
+[Layers Tightening]
+[Distant Saxophone, Single Long Note]
 
-[Final Note]
-[Sustained, Into Silence]
+[Climax Approach]
+[Tension At Peak, No Resolution]
+
+[Cut]
+[Sudden Stop Into Silence]
 ```
 
 ## 연출 노트
 
-- 피아노 + 업라이트 베이스만. 드럼 없음. Rhodes 아닌 어쿠스틱 피아노 (Track 1과 호응).
-- 베이스는 아르코(활) 주법 — 핑거가 아닌 활로 긴 음을 켜서 긴장감 유지.
-- 두 악기가 대화하는 구조. 한쪽이 프레이즈를 던지면 다른 쪽이 받는다.
-- 후반으로 갈수록 음 사이 간격이 넓어지다가 — 마지막 음이 길게 울린 채 끝난다.
-- **이 침묵 직후에 Track 6이 드럼 필인으로 터진다.** 그 대비가 Suite의 클라이맥스.
+- 베이스가 **짧은 리프를 계속 반복**(오스티나토). 심장박동처럼. 쉬지 않는다.
+- 피아노는 같은 화성을 루프로 반복. 여유로운 대화가 아니라 **불안한 반복**.
+- 브러시 드럼이 최소한의 맥박 유지. 없으면 에너지가 바닥까지 떨어지니까.
+- **색소폰 롱톤** — Track 4에서 퇴장하지 않고 아주 멀리서 한 음만 길게 깔린다. 그리움이 사라지지 않았다는 신호.
+- 마지막은 페이드가 아니라 **컷**. 모든 악기가 동시에 멈추고 → 0.5~1초 침묵 → Track 6 드럼 필인.
+- 템포 88 BPM — Track 4(95)에서 살짝만 내림. 70까지 떨어뜨리지 않는다.
 - Suite에서 가장 짧을 수 있음 (2:30~3:00). 길면 긴장이 풀린다.
+
+---
+
+## Revision Log
+
+### rev 1 → rev 2 (2026-04-02)
+
+**변경 사유**: Track 4에서 색소폰이 감정을 끌어올렸는데, rev 1의 Track 5가 에너지를 바닥까지 꺼뜨림. "고요한 정적"이 아니라 "추락"이 돼서 Track 6 폭발이 처음부터 다시 올라가는 느낌. 4→5→6의 감정선이 끊기는 문제.
+
+**핵심 변경**:
+
+| 항목 | rev 1 (고요) | rev 2 (긴장) |
+|------|-------------|-------------|
+| 제목 | 숨을 고르는 | 숨을 참는 |
+| 템포 | 70 BPM | 88 BPM |
+| 드럼 | 없음 | 브러시 (최소 맥박) |
+| 베이스 | 아르코, 긴 음 | 오스티나토, 짧은 리프 반복 |
+| 피아노 | 대화형 (주고받기) | 루프형 (같은 화성 반복) |
+| 색소폰 | 완전 퇴장 | 롱톤 하나 멀리서 깔림 |
+| 엔딩 | 긴 음 울린 채 페이드 | 모든 악기 동시 컷 → 침묵 |
+| 비유 | 호수에 앉아있는 | 숨 참고 물속에 있는 |
+
+**결과**: Track 4에서 올린 텐션을 유지한 채 악기만 줄이는 방식. 에너지를 내리는 게 아니라 가둔다. 이 압축이 Track 6 드럼 필인에서 한꺼번에 터진다.
