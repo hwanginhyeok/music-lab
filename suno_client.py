@@ -1,85 +1,263 @@
 """
-Suno AI 클라이언트 — undetected-chromedriver 기반 웹 자동화
+Suno AI 클라이언트 — VNC 디스플레이 + Chrome 자동화
 
-Cloudflare Turnstile 우회. 쿠키 인증으로 로그인 유지.
-곡 생성 → 완료 대기 → 다운로드.
+Chrome을 remote-debugging 모드로 VNC 가상 디스플레이(:1)에서 실행.
+전용 프로필(chrome-suno)로 Suno 로그인 유지.
+캡차 감지 시 텔레그램 알림 → noVNC에서 수동 풀기 → 자동 재개.
+곡 생성 완료 감지는 Clerk JWT API 폴링 (페이지 소스 파싱보다 안정적).
 """
 from __future__ import annotations
 
 import logging
 import os
 import re
+import subprocess
 import time
 from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger("music-lab")
 
 SUNO_DIR = Path("data/suno")
+VNC_DISPLAY = os.getenv("VNC_DISPLAY", ":1")
+CHROME_PROFILE = os.path.expanduser(
+    os.getenv("CHROME_PROFILE", "~/.config/chrome-suno")
+)
+CHROME_DEBUG_PORT = int(os.getenv("CHROME_DEBUG_PORT", "9222"))
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "")
+CAPTCHA_TIMEOUT = 300
 
 
 class SunoError(Exception):
     """Suno 관련 에러."""
 
 
-class SunoClient:
-    """undetected-chromedriver 기반 Suno 자동화 클라이언트."""
+def _send_telegram(text: str) -> bool:
+    """텔레그램 알림 전송."""
+    if not TELEGRAM_BOT_TOKEN or not ADMIN_CHAT_ID:
+        logger.warning("텔레그램 알림 설정 없음 (ADMIN_CHAT_ID 필요)")
+        return False
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": ADMIN_CHAT_ID, "text": text},
+            timeout=10,
+        )
+        return resp.ok
+    except Exception as e:
+        logger.warning("텔레그램 알림 실패: %s", e)
+        return False
 
-    def __init__(self, cookie: str | None = None):
-        self.cookie = cookie or os.getenv("SUNO_COOKIE", "")
-        if not self.cookie:
-            raise SunoError("SUNO_COOKIE 환경변수가 설정되지 않았습니다")
+
+def _chrome_running(port: int = CHROME_DEBUG_PORT) -> bool:
+    """Chrome remote debugging 포트 응답 확인."""
+    try:
+        r = requests.get(f"http://127.0.0.1:{port}/json/version", timeout=2)
+        return r.ok
+    except Exception:
+        return False
+
+
+def _start_chrome(display: str = VNC_DISPLAY, port: int = CHROME_DEBUG_PORT):
+    """VNC 디스플레이에서 Chrome 시작 (remote debugging 모드)."""
+    env = os.environ.copy()
+    env["DISPLAY"] = display
+    subprocess.Popen(
+        [
+            "google-chrome",
+            f"--user-data-dir={CHROME_PROFILE}",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--window-size=1280,720",
+            "--no-first-run",
+            "--no-default-browser-check",
+            f"--remote-debugging-port={port}",
+            "about:blank",
+        ],
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    # Chrome 시작 대기
+    for _ in range(10):
+        time.sleep(1)
+        if _chrome_running(port):
+            return
+    raise SunoError("Chrome 시작 실패")
+
+
+# 검증된 React 호환 입력 JS (input + change 이벤트 둘 다 디스패치)
+JS_SET_VALUE = """
+function setNativeValue(element, value) {
+    var proto = element.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+    var valueSetter = Object.getOwnPropertyDescriptor(proto.prototype, 'value').set;
+    var protoSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'value');
+    if (protoSetter && protoSetter.set && valueSetter !== protoSetter.set) {
+        protoSetter.set.call(element, value);
+    } else {
+        valueSetter.call(element, value);
+    }
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+var textareas = document.querySelectorAll('textarea');
+var results = {};
+
+// textarea[0] = lyrics (placeholder에 'Write some lyrics' 포함)
+if (textareas[0]) {
+    textareas[0].focus();
+    setNativeValue(textareas[0], arguments[0]);
+    results.lyrics = textareas[0].value.substring(0, 30);
+}
+
+// textarea[1] = style of music
+if (textareas[1] && textareas[1].offsetParent !== null) {
+    textareas[1].focus();
+    setNativeValue(textareas[1], arguments[1]);
+    results.style = textareas[1].value.substring(0, 30);
+}
+
+// title input
+var titleInput = document.querySelector("input[placeholder='Song Title (Optional)']");
+if (titleInput) {
+    titleInput.focus();
+    setNativeValue(titleInput, arguments[2]);
+    results.title = titleInput.value;
+}
+
+// Create 버튼 상태
+var buttons = document.querySelectorAll('button');
+for (var b of buttons) {
+    if (b.textContent.trim() === 'Create') {
+        results.createEnabled = !b.disabled;
+    }
+}
+
+return results;
+"""
+
+
+class SunoClient:
+    """Chrome + VNC + Clerk JWT API 기반 Suno 자동화 클라이언트.
+
+    흐름: Chrome으로 UI 조작 (입력 + Create 클릭) → API로 생성 완료 감지 + 다운로드.
+    """
+
+    def __init__(self, display: str | None = None, keep_browser: bool = True):
+        self.display = display or VNC_DISPLAY
+        self.keep_browser = keep_browser
         self._driver = None
 
     def _get_driver(self):
-        """undetected-chromedriver lazy init."""
-        if self._driver is None:
-            import undetected_chromedriver as uc
+        """Chrome에 attach. 실행 중이 아니면 자동 시작."""
+        if self._driver is not None:
+            return self._driver
 
-            options = uc.ChromeOptions()
-            options.add_argument("--headless=new")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--window-size=1920,1080")
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
 
-            self._driver = uc.Chrome(options=options, version_main=146)
+        # Chrome이 안 떠있으면 시작
+        if not _chrome_running():
+            logger.info("Chrome 시작 중... (display=%s)", self.display)
+            _start_chrome(self.display)
 
-            # suno.com 접속 후 쿠키 주입
-            self._driver.get("https://suno.com")
-            time.sleep(3)
-            for pair in self.cookie.split("; "):
-                if "=" in pair:
-                    name, val = pair.split("=", 1)
-                    try:
-                        self._driver.add_cookie({
-                            "name": name.strip(),
-                            "value": val.strip(),
-                            "domain": ".suno.com",
-                        })
-                    except Exception:
-                        pass
-            logger.info("Suno 브라우저 초기화 완료")
+        # remote debugging으로 attach
+        options = Options()
+        options.debugger_address = f"127.0.0.1:{CHROME_DEBUG_PORT}"
+        self._driver = webdriver.Chrome(options=options)
+        logger.info("Chrome 연결 완료 (port=%d)", CHROME_DEBUG_PORT)
         return self._driver
 
+    def _detect_captcha(self) -> bool:
+        """실제 차단 캡차 감지 (페이지 임베드 스크립트는 무시)."""
+        driver = self._driver
+        if not driver:
+            return False
+        try:
+            from selenium.webdriver.common.by import By
+
+            # 보이는 캡차 iframe
+            for iframe in driver.find_elements(By.TAG_NAME, "iframe"):
+                src = (iframe.get_attribute("src") or "").lower()
+                if not iframe.is_displayed():
+                    continue
+                size = iframe.size
+                if size.get("height", 0) > 50 and size.get("width", 0) > 50:
+                    if any(s in src for s in ["hcaptcha", "turnstile", "captcha"]):
+                        return True
+
+            # Cloudflare 차단 페이지
+            title = driver.title.lower()
+            if "just a moment" in title or "attention required" in title:
+                return True
+
+            # hCaptcha 오버레이
+            for el in driver.find_elements(
+                By.CSS_SELECTOR, "[class*='captcha'], [id*='captcha'], .h-captcha"
+            ):
+                if el.is_displayed() and el.size.get("height", 0) > 50:
+                    return True
+
+            return False
+        except Exception:
+            return False
+
+    def _wait_captcha(self) -> bool:
+        """캡차 감지 시 알림 후 해결 대기."""
+        if not self._detect_captcha():
+            return True
+
+        logger.warning("캡차 감지! 사용자 개입 필요")
+        _send_telegram(
+            "🔐 Suno 캡차 감지!\n"
+            "noVNC에서 풀어주세요.\n"
+            "http://localhost:6080/vnc.html"
+        )
+
+        start = time.time()
+        while time.time() - start < CAPTCHA_TIMEOUT:
+            time.sleep(3)
+            if not self._detect_captcha():
+                logger.info("캡차 해결됨 — 자동 재개")
+                _send_telegram("✅ 캡차 해결! 자동화 재개합니다.")
+                time.sleep(2)
+                return True
+            elapsed = int(time.time() - start)
+            if elapsed % 30 == 0:
+                logger.info("캡차 대기 중... (%d초)", elapsed)
+
+        logger.error("캡차 타임아웃 (%d초)", CAPTCHA_TIMEOUT)
+        _send_telegram("❌ 캡차 타임아웃 — 자동화 중단됨")
+        return False
+
+    def _get_api(self):
+        """suno_download.py의 SunoAPI 인스턴스."""
+        if not hasattr(self, "_api"):
+            from suno_download import SunoAPI
+            self._api = SunoAPI()
+        return self._api
+
     def get_credits(self) -> int:
-        """남은 크레딧 확인."""
-        driver = self._get_driver()
-        driver.get("https://suno.com/create")
-        time.sleep(5)
-        source = driver.page_source.lower()
-        matches = re.findall(r"(\d+)\s*credit", source)
-        return int(matches[0]) if matches else -1
+        """남은 크레딧 (API)."""
+        return self._get_api().get_credits()
 
     def generate(self, lyrics: str, style: str, title: str = "") -> list[str]:
-        """곡 생성. song URL 리스트 반환 (Suno는 2곡 동시 생성)."""
+        """곡 생성 → song URL 리스트 반환 (Suno는 2곡 동시 생성)."""
         driver = self._get_driver()
         logger.info("Suno 곡 생성 시작: %s", title or "무제")
 
         # Create 페이지 접속
         driver.get("https://suno.com/create")
         time.sleep(5)
+
+        if not self._wait_captcha():
+            raise SunoError("캡차 해결 실패")
 
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import WebDriverWait
@@ -89,163 +267,144 @@ class SunoClient:
 
         # 쿠키 배너 닫기
         try:
-            accept_btn = driver.find_element(By.XPATH, "//button[contains(., 'Accept All')]")
-            accept_btn.click()
+            btn = driver.find_element(By.XPATH, "//button[contains(., 'Accept All')]")
+            btn.click()
             time.sleep(1)
         except Exception:
             pass
 
-        # Advanced 모드 활성화 (Simple → Advanced)
+        # Advanced 모드 활성화
         try:
-            adv_btn = wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Advanced')]"))
+            adv = wait.until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//button[contains(., 'Advanced')]")
+                )
             )
-            adv_btn.click()
+            adv.click()
             time.sleep(2)
             logger.info("Advanced 모드 활성화")
         except Exception:
-            logger.info("Advanced 버튼 못 찾음 — 이미 Advanced 모드일 수 있음")
+            logger.info("이미 Advanced 모드")
 
-        from selenium.webdriver.common.by import By
-        # (re-import for clarity)
-
-        # React 호환 값 설정 JS (proto.set 방식 — 검증됨)
-        JS_SET_VALUE = '''
-function setReactValue(element, value) {
-    var valueSetter = Object.getOwnPropertyDescriptor(
-        element.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-        "value"
-    ).set;
-    var protoSetter = Object.getOwnPropertyDescriptor(
-        Object.getPrototypeOf(element), "value"
-    );
-    if (protoSetter && protoSetter.set && valueSetter !== protoSetter.set) {
-        protoSetter.set.call(element, value);
-    } else {
-        valueSetter.call(element, value);
-    }
-    element.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
-var lyrics = document.querySelector("textarea[placeholder*='Write some lyrics']");
-if (lyrics) { lyrics.focus(); setReactValue(lyrics, arguments[0]); }
-
-var textareas = document.querySelectorAll("textarea");
-var styleTA = null;
-for (var i = 0; i < textareas.length; i++) {
-    if (textareas[i].offsetParent !== null &&
-        !textareas[i].placeholder.includes("Write some lyrics")) {
-        styleTA = textareas[i]; break;
-    }
-}
-if (styleTA) { styleTA.focus(); setReactValue(styleTA, arguments[1]); }
-
-var titleInput = document.querySelector("input[placeholder='Song Title (Optional)']");
-if (titleInput) { titleInput.focus(); setReactValue(titleInput, arguments[2]); }
-
-return {
-    lyrics: lyrics ? lyrics.value.substring(0, 30) : "X",
-    style: styleTA ? styleTA.value.substring(0, 30) : "X"
-};
-'''
-
-        # 가사 + 스타일 + 제목 한번에 입력
+        # JS로 가사 + 스타일 + 제목 입력
         try:
             result = driver.execute_script(JS_SET_VALUE, lyrics, style, title or "")
             logger.info("입력 완료: %s", result)
-            if not result.get("lyrics"):
-                raise SunoError("가사 입력란을 찾을 수 없습니다")
-            if not result.get("style"):
-                raise SunoError("스타일 입력란을 찾을 수 없습니다")
+            if not result.get("createEnabled"):
+                raise SunoError("Create 버튼 비활성화 — 입력이 반영되지 않음")
         except SunoError:
             raise
         except Exception as e:
             raise SunoError(f"입력 실패: {e}") from e
 
-        time.sleep(2)
+        time.sleep(1)
 
-        # 기존 곡 URL 수집 (Create 클릭 전에 — 새 곡 필터링용)
-        source_before = driver.page_source
-        existing_urls = set(re.findall(r'href="(/song/[a-f0-9-]+)"', source_before))
+        # API로 기존 곡 ID 수집
+        api = self._get_api()
+        existing_ids = {s["id"] for s in api.get_songs(page=0) if s.get("id")}
+        logger.info("기존 곡 %d개", len(existing_ids))
 
-        # Create 버튼 클릭
+        # Create 버튼 클릭 (selenium element.click — 검증됨)
         try:
-            buttons = driver.find_elements(By.TAG_NAME, "button")
-            create_btn = None
-            for b in buttons:
-                if b.is_displayed() and b.text.strip() == "Create":
-                    create_btn = b
+            for b in driver.find_elements(By.TAG_NAME, "button"):
+                if b.is_displayed() and b.text.strip() == "Create" and b.is_enabled():
+                    b.click()
+                    logger.info("Create 버튼 클릭")
                     break
-            if not create_btn:
+            else:
                 raise SunoError("Create 버튼을 찾을 수 없습니다")
-            if create_btn.get_attribute("disabled"):
-                raise SunoError("Create 버튼이 비활성화 상태입니다 (입력이 반영 안 됨)")
-            create_btn.click()
-            logger.info("Create 버튼 클릭")
         except SunoError:
             raise
         except Exception as e:
-            raise SunoError(f"Create 버튼 클릭 실패: {e}") from e
+            raise SunoError(f"Create 클릭 실패: {e}") from e
 
-        # 생성 완료 대기 (최대 5분)
-        logger.info("곡 생성 대기 중...")
-        new_urls = []
-        for i in range(60):  # 60 * 5초 = 5분
+        time.sleep(3)
+        if not self._wait_captcha():
+            raise SunoError("Create 후 캡차 해결 실패")
+
+        # API 폴링으로 생성 완료 대기 (최대 5분)
+        logger.info("곡 생성 대기 중... (API 폴링)")
+        _send_telegram(f"🎵 Suno 곡 생성 시작: {title or '무제'}\n대기 중...")
+
+        new_songs = []
+        for i in range(60):
             time.sleep(5)
-            source = driver.page_source
+            try:
+                api._jwt = None  # JWT 갱신 강제
+                current = api.get_songs(page=0)
+                new_complete = [
+                    s for s in current
+                    if s.get("id") and s["id"] not in existing_ids
+                    and s.get("status") == "complete"
+                ]
 
-            all_urls = set(re.findall(r'href="(/song/[a-f0-9-]+)"', source))
-            new_urls = list(all_urls - existing_urls)
+                if new_complete:
+                    new_songs = new_complete
+                    logger.info("곡 생성 완료: %d곡", len(new_songs))
+                    _send_telegram(
+                        f"✅ Suno 생성 완료! {len(new_songs)}곡\n"
+                        + "\n".join(
+                            f"https://suno.com/song/{s['id']}" for s in new_songs
+                        )
+                    )
+                    break
 
-            if len(new_urls) >= 2:
-                logger.info("곡 생성 완료: %d곡", len(new_urls))
-                break
+                pending = [
+                    s for s in current
+                    if s.get("id") and s["id"] not in existing_ids
+                    and s.get("status") != "complete"
+                ]
+                if pending:
+                    logger.info(
+                        "생성 중... (%d초, status=%s)",
+                        i * 5, pending[0].get("status"),
+                    )
+                elif i % 6 == 0:
+                    logger.info("대기 중... (%d초)", i * 5)
+            except Exception as e:
+                logger.warning("API 폴링 실패: %s", e)
 
-            if i % 6 == 0:
-                logger.info("생성 중... (%d초)", i * 5)
-
-        if not new_urls:
+        if not new_songs:
+            _send_telegram("❌ Suno 곡 생성 타임아웃 (5분)")
             raise SunoError("곡 생성 타임아웃 (5분)")
 
-        return [f"https://suno.com{url}" for url in new_urls]
+        return [f"https://suno.com/song/{s['id']}" for s in new_songs]
 
     def download(self, song_url: str, output_path: str | None = None) -> Path:
-        """곡 페이지에서 오디오 URL 추출 후 다운로드."""
-        driver = self._get_driver()
-        driver.get(song_url)
-        time.sleep(5)
+        """API 기반 곡 다운로드."""
+        song_id = song_url.rstrip("/").split("/")[-1]
+        api = self._get_api()
+        song = api.get_song(song_id)
+        if not song:
+            raise SunoError(f"곡 조회 실패: {song_id}")
 
-        source = driver.page_source
+        audio_url = song.get("audio_url")
+        if not audio_url:
+            raise SunoError(f"오디오 URL 없음: {song_id}")
 
-        # audio URL 추출 (mp3/wav) — 이스케이프 문자 제거
-        audio_matches = re.findall(
-            r'(https://cdn[^"\'\\]+\.(?:mp3|wav|m4a))', source
-        )
-        if not audio_matches:
-            raise SunoError(f"오디오 URL을 찾을 수 없습니다: {song_url}")
-
-        audio_url = audio_matches[0]
         SUNO_DIR.mkdir(parents=True, exist_ok=True)
-
         if output_path:
             path = Path(output_path)
         else:
-            # URL에서 song_id 추출
-            song_id = song_url.rstrip("/").split("/")[-1]
             ext = "mp3" if ".mp3" in audio_url else "wav"
             path = SUNO_DIR / f"{song_id}.{ext}"
 
-        import requests
         resp = requests.get(audio_url, timeout=60)
         resp.raise_for_status()
-
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(resp.content)
         logger.info("다운로드 완료: %s (%.1fMB)", path, len(resp.content) / 1024 / 1024)
         return path
 
     def close(self):
-        """브라우저 종료."""
+        """selenium 연결 해제. keep_browser=True면 Chrome은 유지."""
         if self._driver:
-            self._driver.quit()
+            if self.keep_browser:
+                # selenium detach만 (Chrome은 계속 실행)
+                try:
+                    self._driver.service.stop()
+                except Exception:
+                    pass
+            else:
+                self._driver.quit()
             self._driver = None
