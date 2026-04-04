@@ -38,6 +38,11 @@ class SunoAuthError(Exception):
     """Suno 인증 실패 예외. 쿠키 만료, JWT 갱신 실패 등."""
 
 
+def _safe_filename(title: str) -> str:
+    """파일명에서 안전하지 않은 문자 제거."""
+    return "".join(c for c in title if c.isalnum() or c in " ._-").strip() or "unknown"
+
+
 class SunoAPI:
     """Clerk JWT 인증 기반 Suno API 클라이언트."""
 
@@ -122,7 +127,7 @@ class SunoAPI:
 
         song_id = song.get("id", "unknown")
         title = song.get("title", "").strip() or song_id
-        safe_title = "".join(c for c in title if c.isalnum() or c in " ._-").strip()
+        safe_title = _safe_filename(title)
 
         ext = "mp3"
         if ".wav" in audio_url:
@@ -153,7 +158,7 @@ class SunoAPI:
 
         song_id = song.get("id", "unknown")
         title = song.get("title", "").strip() or song_id
-        safe_title = "".join(c for c in title if c.isalnum() or c in " ._-").strip()
+        safe_title = _safe_filename(title)
         cover_path = output_dir / f"{safe_title}_{song_id[:8]}_cover.jpeg"
 
         if cover_path.exists():
@@ -322,10 +327,15 @@ def upload_to_youtube(song: dict, audio_path: Path):
     )
 
     response = None
-    while response is None:
+    for _ in range(200):
         status, response = request.next_chunk()
         if status:
             print(f"  진행: {int(status.progress() * 100)}%")
+        if response:
+            break
+    else:
+        print("  ❌ YouTube 업로드 타임아웃")
+        return
 
     video_id = response.get("id")
     if video_id:

@@ -64,6 +64,8 @@ def _chrome_running(port: int = CHROME_DEBUG_PORT) -> bool:
 
 def _start_chrome(display: str = VNC_DISPLAY, port: int = CHROME_DEBUG_PORT):
     """VNC 디스플레이에서 Chrome 시작 (remote debugging 모드)."""
+    if os.getuid() == 0:
+        logger.warning("Chrome을 root로 실행 중 — --no-sandbox 보안 위험. non-root 사용자 권장.")
     env = os.environ.copy()
     env["DISPLAY"] = display
     subprocess.Popen(
@@ -397,6 +399,12 @@ class SunoClient:
         path.write_bytes(resp.content)
         logger.info("다운로드 완료: %s (%.1fMB)", path, len(resp.content) / 1024 / 1024)
         return path
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
 
     def close(self):
         """selenium 연결 해제. keep_browser=True면 Chrome은 유지."""

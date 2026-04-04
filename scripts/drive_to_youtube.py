@@ -78,6 +78,10 @@ def list_audio_files(drive, folder_id: str | None = None, limit: int = 20):
     """Drive에서 오디오 파일 목록 조회."""
     q = "mimeType contains 'audio/'"
     if folder_id:
+        import re as _re
+        if not _re.match(r'^[a-zA-Z0-9_-]+$', folder_id):
+            print("[오류] 잘못된 folder_id 형식")
+            return []
         q += f" and '{folder_id}' in parents"
 
     results = drive.files().list(
@@ -295,6 +299,7 @@ def main():
         sys.exit(1)
 
     # 4. YouTube 업로드
+    url = None
     if args.skip_upload:
         print("\n[4/4] 업로드 스킵 (--skip-upload)")
     else:
@@ -307,7 +312,7 @@ def main():
     print("  완료!")
     print(f"  오디오: {audio_path}")
     print(f"  영상: {video_path}")
-    if not args.skip_upload:
+    if url:
         print(f"  YouTube: {url}")
     print("=" * 60)
 
