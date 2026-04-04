@@ -127,6 +127,8 @@ async def _check_auth(update: Update) -> bool:
 _claude_semaphore = asyncio.Semaphore(2)
 # Suno 곡 생성 동시 실행 제한 (Chrome 자동화 — 1개만 허용)
 _suno_semaphore = asyncio.Semaphore(1)
+# ask_claude 타임아웃 식별용 접두사
+_TIMEOUT_PREFIX = "⚠️ 응답 시간 초과"
 # per-user 락 (한 사용자의 중복 요청 방지)
 MAX_USER_LOCKS = 500
 _user_locks: dict[int, asyncio.Lock] = {}
@@ -149,12 +151,25 @@ def _get_user_lock(user_id: int) -> asyncio.Lock:
 # ---------------------------------------------------------------------------
 # 컨텍스트 포매팅
 # ---------------------------------------------------------------------------
+RECENT_PAIRS_KEEP = 5  # 최근 5쌍(10개 메시지)은 원문 유지
+
+
 def format_context(history: list[dict], current_message: str) -> str:
-    """대화 히스토리 + 현재 메시지를 프롬프트로 포맷."""
+    """대화 히스토리 + 현재 메시지를 프롬프트로 포맷.
+
+    히스토리가 RECENT_PAIRS_KEEP쌍을 초과하면 오래된 대화는 요약으로 대체.
+    """
     if not history:
         return current_message
 
     lines = ["[이전 대화]"]
+
+    # 히스토리 압축: 5쌍(10메시지) 초과 시 오래된 부분 요약
+    recent_count = RECENT_PAIRS_KEEP * 2
+    if len(history) > recent_count:
+        lines.append("[이전 대화 요약: 음악 이론, 코드 진행, MIDI 생성 등에 대해 대화함]")
+        history = history[-recent_count:]
+
     for msg in history:
         role_label = "USER" if msg["role"] == "user" else "ASSISTANT"
         # 히스토리에 midi-json 블록이 있으면 요약 (프롬프트 비대화 방지)
@@ -177,7 +192,11 @@ def format_context(history: list[dict], current_message: str) -> str:
 # ---------------------------------------------------------------------------
 # Claude CLI 호출 (API 키 불필요, OAuth 사용)
 # ---------------------------------------------------------------------------
-async def ask_claude(message: str, history: list[dict] | None = None) -> str:
+async def ask_claude(
+    message: str,
+    history: list[dict] | None = None,
+    timeout: int = 120,
+) -> str:
     """Claude CLI로 음악 대화. 로컬 OAuth 인증 사용."""
     prompt_text = format_context(history or [], message)
 
@@ -193,7 +212,9 @@ async def ask_claude(message: str, history: list[dict] | None = None) -> str:
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(Path.home() / "music-lab"),
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=timeout,
+            )
         response = stdout.decode("utf-8").strip()
 
         if not response:
@@ -204,10 +225,13 @@ async def ask_claude(message: str, history: list[dict] | None = None) -> str:
         return response
     except asyncio.TimeoutError:
         # 좀비 프로세스 방지: 타임아웃 시 npx 프로세스 강제 종료
-        proc.kill()
-        await proc.wait()
-        logger.warning("Claude CLI 타임아웃 — 프로세스 kill (pid=%s)", proc.pid)
-        return "⚠️ 응답 시간 초과 (2분). 더 짧은 요청으로 다시 시도해주세요."
+        try:
+            proc.kill()
+            await proc.wait()
+        except Exception:
+            pass
+        logger.warning("Claude CLI 타임아웃 (%d초) — 프로세스 kill (pid=%s)", timeout, proc.pid)
+        return f"{_TIMEOUT_PREFIX}. 더 짧은 요청으로 다시 시도해주세요."
     except Exception as e:
         logger.error("Claude CLI 오류: %s", e)
         return f"⚠️ 오류: {e}"
@@ -405,10 +429,79 @@ async def _respond_with_midi(update: Update, response: str, session_id: str | No
             )
 
 
+async def _update_progress(status_msg, thinking_emoji: str) -> None:
+    """30초마다 진행 상황 메시지를 업데이트하는 루프."""
+    progress_messages = [
+        (30, "아직 생각 중... ⏱️ 30초"),
+        (60, "복잡한 요청이라 시간이 걸리고 있어요... ⏱️ 1분"),
+        (90, "거의 다 됐을 거예요... ⏱️ 1분 30초"),
+        (120, "조금만 더 기다려주세요... ⏱️ 2분"),
+    ]
+    elapsed = 0
+    msg_idx = 0
+    while msg_idx < len(progress_messages):
+        await asyncio.sleep(30)
+        elapsed += 30
+        target_elapsed, text = progress_messages[msg_idx]
+        if elapsed >= target_elapsed:
+            try:
+                await status_msg.edit_text(f"{thinking_emoji} {text}")
+            except Exception:
+                pass
+            msg_idx += 1
+    # 120초 이후에도 계속 대기 중이면 30초마다 업데이트
+    while True:
+        await asyncio.sleep(30)
+        elapsed += 30
+        minutes = elapsed // 60
+        seconds = elapsed % 60
+        time_str = f"{minutes}분" + (f" {seconds}초" if seconds else "")
+        try:
+            await status_msg.edit_text(f"{thinking_emoji} 조금만 더 기다려주세요... ⏱️ {time_str}")
+        except Exception:
+            pass
+
+
+def _get_timeout_error_message(
+    user_message: str, history: list[dict] | None
+) -> str:
+    """타임아웃 상황에 맞는 구체적 에러 메시지 반환."""
+    msg_lower = user_message.lower()
+    midi_keywords = ["midi", "멀티트랙", "풀트랙", "트랙", "멜로디", "코드 진행"]
+    if any(kw in msg_lower for kw in midi_keywords):
+        return (
+            "🎹 MIDI 생성이 복잡해서 시간이 걸렸어요. "
+            "트랙 수를 줄이거나 /new 후 다시 해보세요."
+        )
+    if history and len(history) > 10:
+        return (
+            "💬 대화가 길어져서 느려졌어요. "
+            "/new로 새 대화를 시작하면 빨라져요."
+        )
+    return "⏱️ 응답 시간 초과. 더 짧은 요청으로 다시 시도해주세요."
+
+
+def _get_thinking_message(user_message: str, thinking_emoji: str) -> str:
+    """요청 복잡도에 따라 적절한 대기 안내 메시지 반환."""
+    msg_lower = user_message.lower()
+    multitrack_keywords = ["멀티트랙", "풀트랙", "3트랙", "4트랙", "전체", "풀 편곡"]
+    if any(kw in msg_lower for kw in multitrack_keywords):
+        return "🎼 멀티트랙 생성은 1-3분 걸릴 수 있어요. 잠시 기다려주세요..."
+    lyrics_keywords = ["가사", "작사", "벌스", "코러스", "브릿지", "lyrics"]
+    if any(kw in msg_lower for kw in lyrics_keywords):
+        return "✍️ 작사 중... (30초~1분)"
+    if thinking_emoji in ("🎼", "🎹"):
+        return f"{thinking_emoji} 생성 중..."
+    return f"{thinking_emoji} 생각하는 중..."
+
+
 async def _handle_with_memory(
-    update: Update, user_message: str, thinking_emoji: str = "💭"
+    update: Update,
+    user_message: str,
+    thinking_emoji: str = "💭",
+    timeout: int = 120,
 ) -> None:
-    """대화 기억이 있는 공통 핸들러. per-user lock + DB 저장/조회."""
+    """대화 기억이 있는 공통 핸들러. per-user lock + DB 저장/조회 + 진행 업데이트."""
     if not update.effective_user or not update.message:
         return
     if not await _check_auth(update):
@@ -423,7 +516,8 @@ async def _handle_with_memory(
         return
 
     async with lock:
-        await update.message.reply_text(f"{thinking_emoji} 생각하는 중...")
+        thinking_text = _get_thinking_message(user_message, thinking_emoji)
+        status_msg = await update.message.reply_text(thinking_text)
 
         # 세션 + 히스토리 조회
         session_id = db.get_or_create_session(user_id)
@@ -432,10 +526,44 @@ async def _handle_with_memory(
         # 사용자 메시지 저장
         db.save_message(user_id, session_id, "user", user_message)
 
-        # Claude 호출 (히스토리 포함)
-        response = await ask_claude(user_message, history)
+        # Claude 호출 + 진행 상황 업데이트 (30초마다)
+        progress_task = asyncio.create_task(
+            _update_progress(status_msg, thinking_emoji)
+        )
+        try:
+            response = await ask_claude(user_message, history, timeout=timeout)
+        finally:
+            progress_task.cancel()
+            try:
+                await progress_task
+            except asyncio.CancelledError:
+                pass
 
-        # 응답 전송 + assistant 메시지 저장 (MIDI 포함 시 _respond_with_midi에서 처리)
+        # 타임아웃 시 히스토리 제거 후 1회 재시도
+        if response.startswith(_TIMEOUT_PREFIX) and history:
+            try:
+                await status_msg.edit_text(
+                    f"{thinking_emoji} 시간 초과... 히스토리 없이 재시도 중"
+                )
+            except Exception:
+                pass
+            retry_progress = asyncio.create_task(
+                _update_progress(status_msg, thinking_emoji)
+            )
+            try:
+                response = await ask_claude(user_message, history=None, timeout=60)
+            finally:
+                retry_progress.cancel()
+                try:
+                    await retry_progress
+                except asyncio.CancelledError:
+                    pass
+
+        # 최종 타임아웃 시 상황별 구체적 에러 메시지
+        if response.startswith(_TIMEOUT_PREFIX):
+            response = _get_timeout_error_message(user_message, history)
+
+        # 응답 전송 + assistant 메시지 저장
         await _respond_with_midi(update, response, session_id)
 
 
@@ -446,6 +574,7 @@ async def cmd_lyrics(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         f"작사 요청: '{topic}'\n\n벌스 2개, 코러스, 브릿지 포함해서 가사를 써줘. "
         "각 파트가 왜 이렇게 구성되는지 작사 기법도 간단히 설명해줘.",
         thinking_emoji="✍️",
+        timeout=150,
     )
 
 
@@ -457,6 +586,7 @@ async def cmd_chord(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "8마디 코드 진행을 추천해줘. 각 코드가 왜 그 위치에 있는지 설명하고, "
         "MIDI로도 생성해줘 (피아노, 코드당 2비트씩). midi-json 블록으로 포함해.",
         thinking_emoji="🎹",
+        timeout=180,
     )
 
 
@@ -468,6 +598,7 @@ async def cmd_midi(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "설명에 맞는 멜로디/코드를 midi-json 블록으로 생성해줘. "
         "음악적으로 왜 이런 선택을 했는지 간단히 설명도 해줘.",
         thinking_emoji="🎼",
+        timeout=240,
     )
 
 
