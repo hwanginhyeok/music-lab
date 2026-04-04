@@ -18,20 +18,24 @@ logger = logging.getLogger("music-lab")
 DB_PATH = os.environ.get("MUSIC_LAB_DB", "data/music-lab.db")
 
 
+_conn: sqlite3.Connection | None = None
+
+
 def _get_conn() -> sqlite3.Connection:
-    """DB 연결. 파일과 디렉토리가 없으면 자동 생성."""
-    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    return conn
+    """싱글턴 DB 연결. 최초 호출 시 생성, 이후 재사용."""
+    global _conn
+    if _conn is None:
+        Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+        _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        _conn.row_factory = sqlite3.Row
+        _conn.execute("PRAGMA journal_mode=WAL")
+    return _conn
 
 
 def init_db() -> None:
     """테이블 생성 (봇 시작 시 호출)."""
     conn = _get_conn()
-    try:
-        conn.executescript("""
+    conn.executescript("""
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY,
                 user_id INTEGER NOT NULL,
@@ -78,50 +82,42 @@ def init_db() -> None:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
-        conn.commit()
-    finally:
-        conn.close()
+    conn.commit()
 
 
 def get_or_create_session(user_id: int) -> str:
     """활성 세션 ID 반환. 없으면 새로 생성."""
     conn = _get_conn()
-    try:
-        row = conn.execute(
-            "SELECT session_id FROM sessions WHERE user_id = ? AND is_active = 1 "
-            "ORDER BY created_at DESC LIMIT 1",
-            (user_id,),
-        ).fetchone()
-        if row:
-            return row["session_id"]
-        session_id = str(uuid.uuid4())[:8]
-        conn.execute(
-            "INSERT INTO sessions (session_id, user_id) VALUES (?, ?)",
-            (session_id, user_id),
-        )
-        conn.commit()
-        return session_id
-    finally:
-        conn.close()
+    row = conn.execute(
+        "SELECT session_id FROM sessions WHERE user_id = ? AND is_active = 1 "
+        "ORDER BY created_at DESC LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    if row:
+        return row["session_id"]
+    session_id = str(uuid.uuid4())[:8]
+    conn.execute(
+        "INSERT INTO sessions (session_id, user_id) VALUES (?, ?)",
+        (session_id, user_id),
+    )
+    conn.commit()
+    return session_id
 
 
 def new_session(user_id: int) -> str:
     """현재 세션 비활성화하고 새 세션 생성."""
     conn = _get_conn()
-    try:
-        conn.execute(
-            "UPDATE sessions SET is_active = 0 WHERE user_id = ? AND is_active = 1",
-            (user_id,),
-        )
-        session_id = str(uuid.uuid4())[:8]
-        conn.execute(
-            "INSERT INTO sessions (session_id, user_id) VALUES (?, ?)",
-            (session_id, user_id),
-        )
-        conn.commit()
-        return session_id
-    finally:
-        conn.close()
+    conn.execute(
+        "UPDATE sessions SET is_active = 0 WHERE user_id = ? AND is_active = 1",
+        (user_id,),
+    )
+    session_id = str(uuid.uuid4())[:8]
+    conn.execute(
+        "INSERT INTO sessions (session_id, user_id) VALUES (?, ?)",
+        (session_id, user_id),
+    )
+    conn.commit()
+    return session_id
 
 
 def save_message(
@@ -143,8 +139,6 @@ def save_message(
         conn.commit()
     except sqlite3.Error as e:
         logger.error("DB 저장 오류: %s", e)
-    finally:
-        conn.close()
 
 
 def get_history(session_id: str, limit: int = 10) -> list[dict]:
@@ -161,8 +155,6 @@ def get_history(session_id: str, limit: int = 10) -> list[dict]:
     except sqlite3.Error as e:
         logger.error("DB 조회 오류: %s", e)
         return []
-    finally:
-        conn.close()
 
 
 def save_idea(
@@ -185,8 +177,6 @@ def save_idea(
     except sqlite3.Error as e:
         logger.error("아이디어 저장 오류: %s", e)
         return 0
-    finally:
-        conn.close()
 
 
 def get_ideas(user_id: int, limit: int = 20) -> list[dict]:
@@ -211,8 +201,6 @@ def get_ideas(user_id: int, limit: int = 20) -> list[dict]:
     except sqlite3.Error as e:
         logger.error("아이디어 조회 오류: %s", e)
         return []
-    finally:
-        conn.close()
 
 
 def save_suno_song(
@@ -235,8 +223,6 @@ def save_suno_song(
     except sqlite3.Error as e:
         logger.error("Suno 곡 저장 오류: %s", e)
         return 0
-    finally:
-        conn.close()
 
 
 def update_suno_status(
@@ -257,8 +243,6 @@ def update_suno_status(
         conn.commit()
     except sqlite3.Error as e:
         logger.error("Suno 상태 업데이트 오류: %s", e)
-    finally:
-        conn.close()
 
 
 def get_suno_songs(user_id: int, limit: int = 20) -> list[dict]:
@@ -274,8 +258,6 @@ def get_suno_songs(user_id: int, limit: int = 20) -> list[dict]:
     except sqlite3.Error as e:
         logger.error("Suno 곡 조회 오류: %s", e)
         return []
-    finally:
-        conn.close()
 
 
 def get_suno_song(song_id: str) -> dict | None:
@@ -289,8 +271,6 @@ def get_suno_song(song_id: str) -> dict | None:
     except sqlite3.Error as e:
         logger.error("Suno 곡 조회 오류: %s", e)
         return None
-    finally:
-        conn.close()
 
 
 def get_session_messages(session_id: str, limit: int = 50) -> list[dict]:
@@ -309,8 +289,6 @@ def get_session_messages(session_id: str, limit: int = 50) -> list[dict]:
     except sqlite3.Error as e:
         logger.error("세션 메시지 조회 오류: %s", e)
         return []
-    finally:
-        conn.close()
 
 
 def get_idea_by_id(idea_id: int) -> dict | None:
@@ -334,86 +312,3 @@ def get_idea_by_id(idea_id: int) -> dict | None:
     except sqlite3.Error as e:
         logger.error("아이디어 조회 오류: %s", e)
         return None
-    finally:
-        conn.close()
-
-
-# ---------------------------------------------------------------------------
-# Suno 곡 메타데이터
-# ---------------------------------------------------------------------------
-def save_suno_song(
-    user_id: int,
-    title: str,
-    song_id: str,
-    style: str = "",
-    lyrics: str = "",
-) -> int:
-    """Suno 곡 메타데이터 저장."""
-    conn = _get_conn()
-    try:
-        cursor = conn.execute(
-            "INSERT INTO suno_songs (user_id, title, song_id, style, lyrics) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (user_id, title, song_id, style, lyrics),
-        )
-        conn.commit()
-        return cursor.lastrowid or 0
-    except sqlite3.Error as e:
-        logger.error("Suno 곡 저장 오류: %s", e)
-        return 0
-    finally:
-        conn.close()
-
-
-def update_suno_status(
-    song_id: str,
-    status: str,
-    local_path: str | None = None,
-    drive_url: str | None = None,
-    duration_sec: float | None = None,
-) -> None:
-    """Suno 곡 상태 업데이트."""
-    conn = _get_conn()
-    try:
-        conn.execute(
-            "UPDATE suno_songs SET status=?, local_path=?, drive_url=?, duration_sec=? "
-            "WHERE song_id=?",
-            (status, local_path, drive_url, duration_sec, song_id),
-        )
-        conn.commit()
-    except sqlite3.Error as e:
-        logger.error("Suno 상태 업데이트 오류: %s", e)
-    finally:
-        conn.close()
-
-
-def get_suno_songs(user_id: int, limit: int = 20) -> list[dict]:
-    """사용자의 Suno 곡 목록."""
-    conn = _get_conn()
-    try:
-        rows = conn.execute(
-            "SELECT id, title, song_id, status, local_path, drive_url, duration_sec, created_at "
-            "FROM suno_songs ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-    except sqlite3.Error as e:
-        logger.error("Suno 곡 조회 오류: %s", e)
-        return []
-    finally:
-        conn.close()
-
-
-def get_suno_song(song_id: str) -> dict | None:
-    """song_id로 Suno 곡 조회."""
-    conn = _get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM suno_songs WHERE song_id = ?", (song_id,)
-        ).fetchone()
-        return dict(row) if row else None
-    except sqlite3.Error as e:
-        logger.error("Suno 곡 조회 오류: %s", e)
-        return None
-    finally:
-        conn.close()

@@ -14,8 +14,10 @@ def 임시_db(tmp_path):
     """각 테스트마다 임시 DB 사용."""
     db_path = str(tmp_path / "test.db")
     db.DB_PATH = db_path
+    db._conn = None  # 싱글턴 커넥션 리셋
     db.init_db()
     yield db_path
+    db._conn = None  # 테스트 후 정리
 
 
 # ---------------------------------------------------------------------------
