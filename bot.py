@@ -143,7 +143,7 @@ async def ask_claude(message: str, history: list[dict] | None = None) -> str:
     try:
         async with _claude_semaphore:
             proc = await asyncio.create_subprocess_exec(
-                "npx", "-y", "@anthropic-ai/claude-code",
+                "npx", "-y", "@anthropic-ai/claude-code@2.1.91",
                 "-p", prompt_text,
                 "--system-prompt", SYSTEM_PROMPT,
                 "--tools", "",
