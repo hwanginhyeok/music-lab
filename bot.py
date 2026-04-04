@@ -45,6 +45,14 @@ import db
 load_dotenv()
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 
+# 허용된 사용자 화이트리스트 (쉼표 구분 user_id). 비어있으면 모든 사용자 허용.
+_allowed_users_raw = os.environ.get("ALLOWED_USERS", "").strip()
+ALLOWED_USERS: set[int] = (
+    {int(uid.strip()) for uid in _allowed_users_raw.split(",") if uid.strip()}
+    if _allowed_users_raw
+    else set()
+)
+
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     level=logging.INFO,
@@ -96,6 +104,22 @@ instrument: GM 악기 번호 (0=피아노, 24=기타, 33=베이스, 48=현악기
 분석: I - V - vi7 - IV
 분위기: 밝음 → 안정 → 섬세함 → 편안
 ```"""
+
+# ---------------------------------------------------------------------------
+# 인증 체크
+# ---------------------------------------------------------------------------
+async def _check_auth(update: Update) -> bool:
+    """ALLOWED_USERS가 설정되어 있으면 화이트리스트 체크. 통과 시 True 반환."""
+    if not ALLOWED_USERS:
+        return True
+    user = update.effective_user
+    if user and user.id in ALLOWED_USERS:
+        return True
+    logger.warning("미허용 사용자 접근 차단: user_id=%s", user.id if user else "?")
+    if update.message:
+        await update.message.reply_text("⛔ 이 봇은 허가된 사용자만 이용할 수 있습니다.")
+    return False
+
 
 # ---------------------------------------------------------------------------
 # 동시성 제어
@@ -225,6 +249,8 @@ def generate_midi(data: dict) -> bytes:
 # 텔레그램 핸들러
 # ---------------------------------------------------------------------------
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_auth(update):
+        return
     await update.message.reply_text(
         "🎵 Music Lab 에 오신 걸 환영합니다!\n\n"
         "AI와 함께 작사/작곡을 배우고 만들어보세요.\n\n"
@@ -238,6 +264,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_auth(update):
+        return
     await update.message.reply_text(
         "🎵 Music Lab 명령어\n\n"
         "/lyrics [주제/장르/분위기]\n"
@@ -269,6 +297,8 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_new(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """새 대화 시작 — 이전 맥락 초기화."""
     if not update.effective_user:
+        return
+    if not await _check_auth(update):
         return
     session_id = db.new_session(update.effective_user.id)
     await update.message.reply_text(
@@ -363,6 +393,8 @@ async def _handle_with_memory(
     """대화 기억이 있는 공통 핸들러. per-user lock + DB 저장/조회."""
     if not update.effective_user or not update.message:
         return
+    if not await _check_auth(update):
+        return
 
     user_id = update.effective_user.id
 
@@ -444,6 +476,8 @@ async def cmd_idea(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """짧은 음악 아이디어를 즉시 MIDI 스니펫으로 기록."""
     if not update.effective_user or not update.message:
         return
+    if not await _check_auth(update):
+        return
     desc = " ".join(ctx.args) if ctx.args else ""
     if not desc:
         await update.message.reply_text(
@@ -515,6 +549,8 @@ async def cmd_library(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """저장된 아이디어 목록 조회."""
     if not update.effective_user:
         return
+    if not await _check_auth(update):
+        return
 
     ideas = db.get_ideas(update.effective_user.id, limit=20)
     if not ideas:
@@ -537,6 +573,8 @@ async def cmd_library(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_export(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """저장된 아이디어의 MIDI 파일 재전송."""
     if not update.effective_user or not update.message:
+        return
+    if not await _check_auth(update):
         return
 
     if not ctx.args:
@@ -589,6 +627,8 @@ async def cmd_export(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_remix(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """기존 아이디어를 다른 스타일로 변형."""
     if not update.effective_user or not update.message:
+        return
+    if not await _check_auth(update):
         return
 
     if not ctx.args or len(ctx.args) < 2:
@@ -882,6 +922,8 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """매일 음악 퀴즈 구독 토글."""
     if not update.effective_user or not update.message:
         return
+    if not await _check_auth(update):
+        return
     await update.message.reply_text(
         "📝 /quiz 로 바로 음악 퀴즈를 풀 수 있어요!\n"
         "(매일 자동 전송 기능은 준비 중입니다)"
@@ -891,6 +933,8 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_quiz(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """음악 이론 퀴즈 한 문제 출제."""
     if not update.effective_user or not update.message:
+        return
+    if not await _check_auth(update):
         return
 
     user_id = update.effective_user.id
@@ -918,7 +962,7 @@ async def cmd_quiz(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_suno(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Suno AI로 곡 생성. /suno <프롬프트파일명>"""
-    if not update.effective_user or not update.message:
+    if not await _check_auth(update):
         return
 
     user_id = update.effective_user.id
@@ -1025,7 +1069,7 @@ async def cmd_suno(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_suno_list(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """생성한 Suno 곡 목록."""
-    if not update.effective_user or not update.message:
+    if not await _check_auth(update):
         return
 
     user_id = update.effective_user.id
@@ -1303,6 +1347,10 @@ async def _run_publish_pipeline(
 # ---------------------------------------------------------------------------
 def main() -> None:
     logger.info("Music Lab 봇 시작 (Claude CLI 로컬 모드)")
+    if ALLOWED_USERS:
+        logger.info("ALLOWED_USERS 화이트리스트 활성: %s", ALLOWED_USERS)
+    else:
+        logger.info("ALLOWED_USERS 미설정 — 모든 사용자 허용")
 
     # DB 초기화
     db.init_db()
