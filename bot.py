@@ -23,7 +23,6 @@ import logging
 import os
 import re
 import subprocess
-from collections import defaultdict
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -129,7 +128,22 @@ _claude_semaphore = asyncio.Semaphore(2)
 # Suno 곡 생성 동시 실행 제한 (Chrome 자동화 — 1개만 허용)
 _suno_semaphore = asyncio.Semaphore(1)
 # per-user 락 (한 사용자의 중복 요청 방지)
-_user_locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+MAX_USER_LOCKS = 500
+_user_locks: dict[int, asyncio.Lock] = {}
+
+
+def _get_user_lock(user_id: int) -> asyncio.Lock:
+    """user_id에 대한 Lock을 반환. 최대 개수 초과 시 잠기지 않은 Lock을 정리."""
+    if user_id not in _user_locks:
+        # 최대 개수 초과 시 잠기지 않은 Lock 제거
+        if len(_user_locks) >= MAX_USER_LOCKS:
+            idle_keys = [k for k, v in _user_locks.items() if not v.locked()]
+            for k in idle_keys:
+                del _user_locks[k]
+                if len(_user_locks) < MAX_USER_LOCKS:
+                    break
+        _user_locks[user_id] = asyncio.Lock()
+    return _user_locks[user_id]
 
 
 # ---------------------------------------------------------------------------
@@ -403,7 +417,7 @@ async def _handle_with_memory(
     user_id = update.effective_user.id
 
     # per-user lock: 이미 처리 중이면 안내 메시지
-    lock = _user_locks[user_id]
+    lock = _get_user_lock(user_id)
     if lock.locked():
         await update.message.reply_text("⏳ 이전 요청을 처리 중이에요. 잠시만 기다려주세요!")
         return
@@ -490,7 +504,7 @@ async def cmd_idea(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     user_id = update.effective_user.id
-    lock = _user_locks[user_id]
+    lock = _get_user_lock(user_id)
     if lock.locked():
         await update.message.reply_text("⏳ 이전 요청을 처리 중이에요.")
         return
@@ -661,7 +675,7 @@ async def cmd_remix(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     user_id = update.effective_user.id
-    lock = _user_locks[user_id]
+    lock = _get_user_lock(user_id)
     if lock.locked():
         await update.message.reply_text("⏳ 이전 요청을 처리 중이에요.")
         return
@@ -849,7 +863,7 @@ async def cmd_save(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     user_id = update.effective_user.id
-    lock = _user_locks[user_id]
+    lock = _get_user_lock(user_id)
     if lock.locked():
         await update.message.reply_text("⏳ 이전 요청을 처리 중이에요.")
         return
@@ -942,7 +956,7 @@ async def cmd_quiz(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     user_id = update.effective_user.id
-    lock = _user_locks[user_id]
+    lock = _get_user_lock(user_id)
     if lock.locked():
         await update.message.reply_text("⏳ 이전 요청을 처리 중이에요.")
         return
