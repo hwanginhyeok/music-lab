@@ -332,7 +332,7 @@ class SunoClient:
         for i in range(60):
             time.sleep(5)
             try:
-                api._jwt = None  # JWT 갱신 강제
+                api.refresh_jwt()  # JWT 갱신 강제
                 current = api.get_songs(page=0)
                 new_complete = [
                     s for s in current

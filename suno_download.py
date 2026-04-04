@@ -83,6 +83,10 @@ class SunoAPI:
         })
         return self._jwt
 
+    def refresh_jwt(self) -> None:
+        """JWT 토큰 캐시를 무효화하여 다음 API 호출 시 재발급."""
+        self._jwt = None
+
     def get_credits(self) -> int:
         """남은 크레딧."""
         self._get_jwt()
