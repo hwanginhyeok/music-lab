@@ -25,11 +25,8 @@ import requests
 logger = logging.getLogger("suno-download")
 
 # .env 로드
-for line in open(Path(__file__).parent / ".env"):
-    line = line.strip()
-    if "=" in line and not line.startswith("#"):
-        k, v = line.split("=", 1)
-        os.environ.setdefault(k, v.strip('"'))
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / ".env")
 
 import db
 
