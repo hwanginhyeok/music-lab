@@ -52,8 +52,8 @@ bossa nova, jazz, Korean male vocal, emotional dreamy, Rhodes, acoustic guitar, 
 괜히 설레는 것도 네 탓이라고 할게
 
 I wanna call you spring
-그래야 일 년에 한 번은
-너를 다시 만날 수 있으니까
+그래야 봄바람이 불 때마다
+너를 떠올릴 수 있으니까
 
 [Instrumental Break]
 [Rhodes Solo, 8 bars]
