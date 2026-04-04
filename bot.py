@@ -101,6 +101,8 @@ instrument: GM 악기 번호 (0=피아노, 24=기타, 33=베이스, 48=현악기
 # ---------------------------------------------------------------------------
 # 글로벌 동시 Claude 프로세스 제한 (OOM 방지)
 _claude_semaphore = asyncio.Semaphore(2)
+# Suno 곡 생성 동시 실행 제한 (Chrome 자동화 — 1개만 허용)
+_suno_semaphore = asyncio.Semaphore(1)
 # per-user 락 (한 사용자의 중복 요청 방지)
 _user_locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
@@ -696,8 +698,11 @@ async def cmd_quiz(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # Suno AI 곡 생성
 # ---------------------------------------------------------------------------
 
-async def cmd_suno(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def cmd_suno(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Suno AI로 곡 생성. /suno <프롬프트파일명>"""
+    if not update.effective_user or not update.message:
+        return
+
     user_id = update.effective_user.id
     text = (update.message.text or "").replace("/suno", "").strip()
 
@@ -710,10 +715,17 @@ async def cmd_suno(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
+    # Suno semaphore: 이미 생성 중이면 안내
+    if _suno_semaphore.locked():
+        await update.message.reply_text(
+            "⏳ Suno 생성이 진행 중입니다. 완료 후 다시 시도해주세요.\n"
+            "(Chrome 자동화는 동시에 1건만 가능)"
+        )
+        return
+
     # 프롬프트 파일 찾기
-    from pathlib import Path as _Path
     prompt_path = None
-    for song_dir in sorted(_Path("songs").iterdir()):
+    for song_dir in sorted(Path("songs").iterdir()):
         if not song_dir.is_dir() or song_dir.name == "template":
             continue
         for f in song_dir.iterdir():
@@ -747,55 +759,59 @@ async def cmd_suno(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     loop = asyncio.get_event_loop()
 
-    try:
-        from suno_client import SunoClient, SunoError
+    async with _suno_semaphore:
+        try:
+            from suno_client import SunoClient, SunoError
 
-        def _generate():
-            client = SunoClient()
-            try:
-                song_urls = client.generate(lyrics=lyrics, style=style, title=title)
-                song_id = song_urls[0].rstrip("/").split("/")[-1]
-                db.save_suno_song(user_id, title, song_id, style, lyrics)
-
-                path = client.download(song_urls[0])
-                drive_url = ""
+            def _generate():
+                client = SunoClient()
                 try:
-                    from drive_uploader import DriveUploader
-                    uploader = DriveUploader()
-                    drive_url = uploader.upload(str(path))
-                except Exception:
-                    pass
-                db.update_suno_status(
-                    song_id, "complete",
-                    local_path=str(path),
-                    drive_url=drive_url,
+                    song_urls = client.generate(lyrics=lyrics, style=style, title=title)
+                    song_id = song_urls[0].rstrip("/").split("/")[-1]
+                    db.save_suno_song(user_id, title, song_id, style, lyrics)
+
+                    path = client.download(song_urls[0])
+                    drive_url = ""
+                    try:
+                        from drive_uploader import DriveUploader
+                        uploader = DriveUploader()
+                        drive_url = uploader.upload(str(path))
+                    except Exception:
+                        pass
+                    db.update_suno_status(
+                        song_id, "complete",
+                        local_path=str(path),
+                        drive_url=drive_url,
+                    )
+                    return song_id, path, drive_url, len(song_urls)
+                finally:
+                    client.close()
+
+            song_id, path, drive_url, num_songs = await loop.run_in_executor(None, _generate)
+
+            result_text = f"✅ 곡 생성 완료!\n🎵 {title} ({num_songs}곡)"
+            if drive_url:
+                result_text += f"\n☁️ {drive_url}"
+
+            await msg.edit_text(result_text)
+
+            with open(path, "rb") as audio_file:
+                await update.message.reply_audio(
+                    audio=audio_file,
+                    title=title,
+                    performer="Suno AI",
                 )
-                return song_id, path, drive_url, len(song_urls)
-            finally:
-                client.close()
 
-        song_id, path, drive_url, num_songs = await loop.run_in_executor(None, _generate)
-
-        result_text = f"✅ 곡 생성 완료!\n🎵 {title} ({num_songs}곡)"
-        if drive_url:
-            result_text += f"\n☁️ {drive_url}"
-
-        await msg.edit_text(result_text)
-
-        with open(path, "rb") as audio_file:
-            await update.message.reply_audio(
-                audio=audio_file,
-                title=title,
-                performer="Suno AI",
-            )
-
-    except Exception as e:
-        logger.error("Suno 파이프라인 오류: %s", e, exc_info=True)
-        await msg.edit_text(f"❌ Suno 생성 실패: {e}")
+        except Exception as e:
+            logger.error("Suno 파이프라인 오류: %s", e, exc_info=True)
+            await msg.edit_text(f"❌ Suno 생성 실패: {e}")
 
 
-async def cmd_suno_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def cmd_suno_list(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """생성한 Suno 곡 목록."""
+    if not update.effective_user or not update.message:
+        return
+
     user_id = update.effective_user.id
     songs = db.get_suno_songs(user_id)
 

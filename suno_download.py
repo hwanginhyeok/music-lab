@@ -14,12 +14,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 import time
 from pathlib import Path
 
 import requests
+
+logger = logging.getLogger("suno-download")
 
 # .env 로드
 for line in open(Path(__file__).parent / ".env"):
@@ -34,6 +37,10 @@ SUNO_DIR = Path("data/suno")
 SUNO_DIR.mkdir(parents=True, exist_ok=True)
 
 
+class SunoAuthError(Exception):
+    """Suno 인증 실패 예외. 쿠키 만료, JWT 갱신 실패 등."""
+
+
 class SunoAPI:
     """Clerk JWT 인증 기반 Suno API 클라이언트."""
 
@@ -43,8 +50,8 @@ class SunoAPI:
     def __init__(self):
         self.cookie = os.getenv("SUNO_COOKIE", "")
         if not self.cookie:
-            print("❌ SUNO_COOKIE 환경변수 필요")
-            sys.exit(1)
+            logger.error("SUNO_COOKIE 환경변수 필요")
+            raise SunoAuthError("SUNO_COOKIE 환경변수가 설정되지 않았습니다")
         self._jwt = None
         self._session = requests.Session()
 
@@ -61,15 +68,15 @@ class SunoAPI:
         data = resp.json()["response"]
         sessions = data.get("sessions", [])
         if not sessions:
-            print("❌ Suno 세션 없음 — 쿠키 만료. 브라우저에서 재로그인 필요.")
-            sys.exit(1)
+            logger.error("Suno 세션 없음 — 쿠키 만료. 브라우저에서 재로그인 필요.")
+            raise SunoAuthError("Suno 세션 없음 — 쿠키 만료. 브라우저에서 재로그인 필요")
 
         sid = sessions[0]["id"]
         token_resp = s.post(f"{self.CLERK_URL}/v1/client/sessions/{sid}/tokens?_clerk_js_version=5.117.0")
         self._jwt = token_resp.json().get("jwt", "")
         if not self._jwt:
-            print("❌ JWT 토큰 갱신 실패")
-            sys.exit(1)
+            logger.error("JWT 토큰 갱신 실패")
+            raise SunoAuthError("JWT 토큰 갱신 실패")
 
         self._session.headers.update({
             "Authorization": f"Bearer {self._jwt}",
