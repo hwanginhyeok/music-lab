@@ -1,6 +1,9 @@
-# 봄이라고 부를게 — Jazz Suite
+# 봄을 통해 너를 봄 — Jazz Suite
+### Seeing You Through Spring
 
 > 봄날의 설렘이 30분 동안 흐르다가, 어느 한 지점에서 그리움으로 뒤집히는 모음곡.
+>
+> 봄(spring)을 통해 너를 봄(seeing) — 계절을 핑계로 시작했지만, 결국 너를 보고 싶었던 이야기.
 
 ---
 
