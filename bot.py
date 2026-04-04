@@ -1269,19 +1269,18 @@ async def _run_publish_pipeline(
         }
 
         # YouTube URL 추출
-        import re as _re
-        url_match = _re.search(r"https://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)", output)
+        url_match = re.search(r"https://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)", output)
         if url_match:
             result["youtube_url"] = url_match.group(0)
             result["youtube_id"] = url_match.group(1)
 
         # 오디오 길이 추출
-        dur_match = _re.search(r"오디오 길이:\s*(\d+)초", output)
+        dur_match = re.search(r"오디오 길이:\s*(\d+)초", output)
         if dur_match:
             result["duration"] = float(dur_match.group(1))
 
         # 영상 경로 추출
-        video_match = _re.search(r"영상:\s*(\S+\.mp4)", output)
+        video_match = re.search(r"영상:\s*(\S+\.mp4)", output)
         if video_match:
             result["video_path"] = video_match.group(1)
 
