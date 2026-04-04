@@ -189,6 +189,10 @@ async def ask_claude(message: str, history: list[dict] | None = None) -> str:
 
         return response
     except asyncio.TimeoutError:
+        # 좀비 프로세스 방지: 타임아웃 시 npx 프로세스 강제 종료
+        proc.kill()
+        await proc.wait()
+        logger.warning("Claude CLI 타임아웃 — 프로세스 kill (pid=%s)", proc.pid)
         return "⚠️ 응답 시간 초과 (2분). 더 짧은 요청으로 다시 시도해주세요."
     except Exception as e:
         logger.error("Claude CLI 오류: %s", e)
