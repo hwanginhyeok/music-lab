@@ -258,6 +258,9 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "/remix [번호] [스타일] — 아이디어 변형\n\n"
         "💾 /save [곡이름] — 대화의 가사/코드를 songs/에 저장\n\n"
         "📝 /quiz — 음악 이론 퀴즈\n\n"
+        "🎬 YouTube 게시\n"
+        "/publish — Suno 곡 목록 + YouTube 업로드\n"
+        "/publish [song_id] — 해당 곡 YouTube 게시\n\n"
         "💬 명령어 없이 자유롭게 대화해도 OK\n"
         "💡 대화 맥락을 기억해서 \"아까 그 코드 바꿔줘\" 가능!",
     )
@@ -1048,6 +1051,257 @@ async def cmd_suno_list(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Stage 3: /publish — Suno 곡 YouTube 게시
+# ---------------------------------------------------------------------------
+async def cmd_publish(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Suno 곡 YouTube 게시 파이프라인.
+
+    /publish         → 최근 Suno 곡 목록 표시
+    /publish {song_id} → 해당 곡 YouTube 업로드
+    """
+    if not update.effective_user or not update.message:
+        return
+
+    user_id = update.effective_user.id
+    arg = " ".join(ctx.args) if ctx.args else ""
+
+    if not arg:
+        # 곡 목록 표시
+        songs = db.get_suno_songs(user_id, limit=10)
+        if not songs:
+            await update.message.reply_text(
+                "📋 Suno 곡이 없습니다.\n\n"
+                "suno_download.py로 곡을 먼저 다운로드하세요:\n"
+                "  python3 suno_download.py --all"
+            )
+            return
+
+        lines = ["🎬 YouTube 게시 가능한 Suno 곡\n"]
+        for s in songs:
+            title = s.get("title", "무제")
+            song_id = s.get("song_id", "?")
+            status = s.get("status", "?")
+            drive_url = s.get("drive_url", "")
+            duration = s.get("duration_sec") or 0
+            local_path = s.get("local_path", "")
+
+            # 상태 아이콘
+            if drive_url and "youtube" in drive_url:
+                icon = "✅"  # 이미 업로드됨
+            elif local_path and Path(local_path).is_file():
+                icon = "📁"  # 로컬 파일 있음
+            else:
+                icon = "⏳"  # 다운로드 필요
+
+            duration_str = f"{duration:.0f}초" if duration else ""
+            lines.append(f"  {icon} {title} {duration_str}")
+            lines.append(f"      /publish {song_id[:8]}")
+            if drive_url and "youtube" in drive_url:
+                lines.append(f"      {drive_url}")
+
+        lines.append("")
+        lines.append("📁 = 게시 가능 | ✅ = 이미 업로드됨 | ⏳ = 파일 없음")
+        lines.append("\n사용법: /publish {song_id}")
+        await update.message.reply_text("\n".join(lines))
+        return
+
+    # song_id로 게시 실행
+    song_id = arg.strip()
+
+    # song_id 부분 매칭 지원 (앞 8자만 입력해도 OK)
+    song = db.get_suno_song(song_id)
+    if not song:
+        # 부분 매칭 시도
+        songs = db.get_suno_songs(user_id, limit=50)
+        matched = [s for s in songs if s.get("song_id", "").startswith(song_id)]
+        if len(matched) == 1:
+            song = db.get_suno_song(matched[0]["song_id"])
+        elif len(matched) > 1:
+            await update.message.reply_text(
+                f"⚠️ '{song_id}'에 매칭되는 곡이 {len(matched)}개입니다. 더 정확한 ID를 입력하세요."
+            )
+            return
+        else:
+            await update.message.reply_text(
+                f"⚠️ '{song_id}'에 해당하는 곡을 찾을 수 없습니다.\n"
+                "/publish 로 곡 목록을 확인하세요."
+            )
+            return
+
+    # 로컬 파일 확인
+    local_path = song.get("local_path", "")
+    if not local_path or not Path(local_path).is_file():
+        await update.message.reply_text(
+            f"⚠️ 로컬 오디오 파일이 없습니다: {local_path or '(경로 없음)'}\n\n"
+            "suno_download.py로 먼저 다운로드하세요:\n"
+            f"  python3 suno_download.py --song-id {song.get('song_id', '')}"
+        )
+        return
+
+    audio_path = Path(local_path)
+    title = song.get("title", audio_path.stem)
+
+    # per-user lock: 중복 실행 방지
+    lock = _user_locks[user_id]
+    if lock.locked():
+        await update.message.reply_text("⏳ 이전 요청을 처리 중이에요. 잠시만 기다려주세요!")
+        return
+
+    async with lock:
+        # 진행 상황 메시지
+        status_msg = await update.message.reply_text(
+            f"🎬 YouTube 게시 시작: {title}\n\n"
+            f"📁 오디오: {audio_path.name}\n"
+            "⏳ 준비 중..."
+        )
+
+        try:
+            # 1단계: 영상 생성 준비
+            await status_msg.edit_text(
+                f"🎬 YouTube 게시: {title}\n\n"
+                "[1/3] 🖼️ 썸네일 준비 중..."
+            )
+
+            # publish.py의 publish() 함수를 subprocess로 실행
+            # (ffmpeg 등 무거운 작업이므로 별도 프로세스)
+            await status_msg.edit_text(
+                f"🎬 YouTube 게시: {title}\n\n"
+                "[2/3] 🎥 영상 생성 중... (1-2분 소요)"
+            )
+
+            # publish.py 실행
+            publish_result = await _run_publish_pipeline(
+                audio_path=audio_path,
+                title=title,
+                song=song,
+            )
+
+            if not publish_result["success"]:
+                failed_steps = [
+                    step for step, ok in publish_result.get("steps", {}).items() if not ok
+                ]
+                await status_msg.edit_text(
+                    f"⚠️ 게시 실패: {title}\n\n"
+                    f"실패 단계: {', '.join(failed_steps)}\n"
+                    "로그를 확인하세요."
+                )
+                return
+
+            # 성공 결과
+            youtube_url = publish_result.get("youtube_url", "")
+            video_path = publish_result.get("video_path", "")
+
+            result_text = f"✅ YouTube 게시 완료: {title}\n\n"
+            if youtube_url:
+                result_text += f"🔗 {youtube_url}\n"
+            if publish_result.get("duration"):
+                d = publish_result["duration"]
+                result_text += f"⏱️ {d:.0f}초 ({d/60:.1f}분)\n"
+
+            await status_msg.edit_text(result_text)
+
+            # DB 업데이트
+            if youtube_url:
+                db.update_suno_status(
+                    song.get("song_id", ""),
+                    "published",
+                    drive_url=youtube_url,
+                )
+
+        except Exception as e:
+            logger.error("YouTube 게시 오류: %s", e)
+            await status_msg.edit_text(
+                f"⚠️ 게시 오류: {title}\n\n{str(e)[:200]}"
+            )
+
+
+async def _run_publish_pipeline(
+    audio_path: Path,
+    title: str,
+    song: dict,
+) -> dict:
+    """publish.py 파이프라인을 subprocess로 실행. 결과 파싱."""
+    project_root = Path(__file__).parent
+
+    cmd = [
+        sys.executable,
+        str(project_root / "scripts" / "publish.py"),
+        "--audio", str(audio_path),
+        "--title", title,
+    ]
+
+    # Suno 커버 이미지 탐색
+    cover_path = audio_path.with_name(audio_path.stem + "_cover.jpeg")
+    if cover_path.is_file():
+        cmd += ["--cover", str(cover_path)]
+
+    # Suno 스타일 태그
+    style = song.get("style", "")
+    if style:
+        cmd += ["--tags", style]
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(project_root),
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=600)
+        output = stdout.decode("utf-8")
+        err_output = stderr.decode("utf-8")
+
+        if proc.returncode != 0:
+            logger.error("publish.py 실패: %s", err_output[:500])
+
+        # 결과 파싱: YouTube URL 추출
+        result = {
+            "success": proc.returncode == 0,
+            "video_path": None,
+            "youtube_url": None,
+            "youtube_id": None,
+            "duration": 0.0,
+            "steps": {
+                "thumbnail": "썸네일" not in err_output or proc.returncode == 0,
+                "video": "영상 생성 실패" not in output,
+                "upload": "업로드 실패" not in output,
+            },
+        }
+
+        # YouTube URL 추출
+        import re as _re
+        url_match = _re.search(r"https://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)", output)
+        if url_match:
+            result["youtube_url"] = url_match.group(0)
+            result["youtube_id"] = url_match.group(1)
+
+        # 오디오 길이 추출
+        dur_match = _re.search(r"오디오 길이:\s*(\d+)초", output)
+        if dur_match:
+            result["duration"] = float(dur_match.group(1))
+
+        # 영상 경로 추출
+        video_match = _re.search(r"영상:\s*(\S+\.mp4)", output)
+        if video_match:
+            result["video_path"] = video_match.group(1)
+
+        return result
+
+    except asyncio.TimeoutError:
+        logger.error("publish.py 타임아웃 (10분)")
+        return {
+            "success": False,
+            "steps": {"thumbnail": False, "video": False, "upload": False},
+        }
+    except Exception as e:
+        logger.error("publish.py 실행 오류: %s", e)
+        return {
+            "success": False,
+            "steps": {"thumbnail": False, "video": False, "upload": False},
+        }
+
+
+# ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
 def main() -> None:
@@ -1075,6 +1329,7 @@ def main() -> None:
     app.add_handler(CommandHandler("quiz", cmd_quiz))
     app.add_handler(CommandHandler("suno", cmd_suno))
     app.add_handler(CommandHandler("suno_list", cmd_suno_list))
+    app.add_handler(CommandHandler("publish", cmd_publish))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("폴링 시작... (대화 기억 활성, Claude CLI OAuth 사용)")
