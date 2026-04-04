@@ -293,6 +293,26 @@ def get_suno_song(song_id: str) -> dict | None:
         conn.close()
 
 
+def get_session_messages(session_id: str, limit: int = 50) -> list[dict]:
+    """세션 전체 메시지 조회 (role + content). /save용 — 가사/코드 추출에 사용."""
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT role, content, created_at FROM messages WHERE session_id = ? "
+            "ORDER BY created_at DESC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+        return [
+            {"role": r["role"], "content": r["content"], "created_at": r["created_at"]}
+            for r in reversed(rows)
+        ]
+    except sqlite3.Error as e:
+        logger.error("세션 메시지 조회 오류: %s", e)
+        return []
+    finally:
+        conn.close()
+
+
 def get_idea_by_id(idea_id: int) -> dict | None:
     """ID로 아이디어 조회 (midi_json 포함)."""
     conn = _get_conn()

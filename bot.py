@@ -11,6 +11,7 @@ Claude Code CLI의 OAuth 인증을 그대로 사용.
   /chord [분위기] — 코드 진행 + MIDI
   /midi [설명]    — 멜로디 MIDI 생성
   /theory [질문]  — 음악 이론 질문
+  /save [곡이름]  — 대화의 가사/코드를 songs/에 저장
   /help           — 도움말
 """
 from __future__ import annotations
@@ -255,6 +256,7 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "/library — 저장된 아이디어 모아보기\n"
         "/export [번호] — MIDI 파일 다시 받기\n"
         "/remix [번호] [스타일] — 아이디어 변형\n\n"
+        "💾 /save [곡이름] — 대화의 가사/코드를 songs/에 저장\n\n"
         "📝 /quiz — 음악 이론 퀴즈\n\n"
         "💬 명령어 없이 자유롭게 대화해도 OK\n"
         "💡 대화 맥락을 기억해서 \"아까 그 코드 바꿔줘\" 가능!",
@@ -658,6 +660,219 @@ async def cmd_remix(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 # ---------------------------------------------------------------------------
+# /save — 대화 내용을 songs/ 디렉토리에 파일로 저장
+# ---------------------------------------------------------------------------
+SONGS_DIR = Path("songs")
+
+
+def _next_song_number() -> int:
+    """songs/ 디렉토리에서 다음 곡 번호 계산. 예: 01, 02 → 다음은 03."""
+    if not SONGS_DIR.exists():
+        return 1
+    max_num = 0
+    for d in SONGS_DIR.iterdir():
+        if d.is_dir():
+            m = re.match(r"^(\d+)_", d.name)
+            if m:
+                max_num = max(max_num, int(m.group(1)))
+    return max_num + 1
+
+
+def _extract_lyrics(messages: list[dict]) -> str | None:
+    """대화 메시지에서 가사 블록 추출. [Verse], [Chorus] 등 섹션 마커 기반."""
+    # assistant 메시지를 역순 탐색 (최근 가사 우선)
+    for msg in reversed(messages):
+        if msg["role"] != "assistant":
+            continue
+        content = msg["content"]
+        # 섹션 마커 패턴: [Verse], [Chorus], [Bridge], [Pre-Chorus], [Outro], [Intro] 등
+        if re.search(r"\[(?:Verse|Chorus|Bridge|Pre-Chorus|Outro|Intro|Hook|Final)", content, re.IGNORECASE):
+            # 가사 영역 추출: 첫 섹션 마커부터 마지막 가사 라인까지
+            lines = content.split("\n")
+            lyrics_lines: list[str] = []
+            in_lyrics = False
+            for line in lines:
+                if re.match(r"\s*\[(?:Verse|Chorus|Bridge|Pre-Chorus|Outro|Intro|Hook|Final)", line, re.IGNORECASE):
+                    in_lyrics = True
+                if in_lyrics:
+                    # midi-json 블록이나 코드 블록은 제외
+                    if line.strip().startswith("```midi-json") or line.strip().startswith("```"):
+                        if "midi-json" in line:
+                            in_lyrics = False
+                            continue
+                    if not in_lyrics:
+                        # midi-json 블록 끝나면 다시 탐색
+                        if line.strip() == "```":
+                            in_lyrics = True
+                        continue
+                    lyrics_lines.append(line)
+            if lyrics_lines:
+                return "\n".join(lyrics_lines).strip()
+    return None
+
+
+def _extract_chords(messages: list[dict]) -> str | None:
+    """대화 메시지에서 코드 진행 추출. | C | G | Am | 또는 C → G → Am 형식 탐색."""
+    # 코드 진행 패턴들 (메시지 필터링용)
+    chord_pipe_pattern = re.compile(r"\|[^|]*[A-G][^|]*\|")
+    analysis_pattern = re.compile(r"(분석|Analysis|분위기|Mood|키|Key)\s*:")
+    chord_arrow_pattern = re.compile(r"[A-G][#b]?(?:m(?:aj)?|dim|aug|sus|add|[0-9])*\s*[→\-–]\s*[A-G]")
+
+    for msg in reversed(messages):
+        if msg["role"] != "assistant":
+            continue
+        content = msg["content"]
+
+        if chord_pipe_pattern.search(content) or analysis_pattern.search(content) or chord_arrow_pattern.search(content):
+            lines = content.split("\n")
+            chord_lines: list[str] = []
+            for line in lines:
+                stripped = line.strip()
+                # 코드 진행 라인 (| 포함)
+                if "|" in stripped and re.search(r"\|.*[A-G]", stripped):
+                    chord_lines.append(line)
+                # 분석/분위기 라인
+                elif analysis_pattern.match(stripped):
+                    chord_lines.append(line)
+                # 코드명 나열 (C → G → Am)
+                elif re.search(r"[A-G][#b]?(?:m(?:aj)?|dim|aug|sus|add|[0-9])*\s*[→\-–]\s*[A-G]", stripped):
+                    chord_lines.append(line)
+                # 빈 줄 (섹션 구분)
+                elif not stripped and chord_lines:
+                    chord_lines.append(line)
+            if chord_lines:
+                return "\n".join(chord_lines).strip()
+    return None
+
+
+def _build_concept(song_name: str, messages: list[dict], has_lyrics: bool, has_chords: bool) -> str:
+    """대화 내용 기반 concept.md 생성. Claude에 보내지 않고 대화에서 직접 추출."""
+    # 사용자 요청에서 장르/분위기 키워드 추출
+    user_requests: list[str] = []
+    for msg in messages:
+        if msg["role"] == "user":
+            user_requests.append(msg["content"])
+
+    # 요청 내용 요약 (최대 3개)
+    request_summary = "\n".join(f"- {req[:100]}" for req in user_requests[:3])
+
+    concept = f"""# {song_name} — 곡 컨셉
+
+## 기본 정보
+- **작업명**: {song_name}
+- **장르**: (대화에서 확인)
+- **BPM**: (미정)
+- **키**: (미정)
+- **버전**: v1.0
+- **생성 방식**: 텔레그램 봇 /save 명령어로 자동 생성
+
+## 핵심 컨셉
+텔레그램 대화에서 추출한 곡 작업물.
+
+## 대화 요청 요약
+{request_summary}
+
+## 포함된 파일
+- concept.md: 이 파일
+{f"- lyrics_v1.md: 가사 초안" if has_lyrics else ""}
+{f"- chord_ref.md: 코드 진행 레퍼런스" if has_chords else ""}
+
+## TODO
+- [ ] 컨셉 보완
+- [ ] 코드 진행 확정
+- [ ] Suno 프롬프트 작성
+- [ ] Suno 생성 + 피드백
+"""
+    return concept.strip() + "\n"
+
+
+async def cmd_save(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """현재 세션의 가사/코드 진행을 songs/ 디렉토리에 저장."""
+    if not update.effective_user or not update.message:
+        return
+
+    # 곡 이름 파싱
+    song_name = " ".join(ctx.args).strip() if ctx.args else ""
+    if not song_name:
+        await update.message.reply_text(
+            "💾 사용법: /save 곡이름\n"
+            "예: /save 비오는_카페\n\n"
+            "현재 세션의 가사/코드 진행을 songs/ 디렉토리에 저장합니다."
+        )
+        return
+
+    user_id = update.effective_user.id
+    lock = _user_locks[user_id]
+    if lock.locked():
+        await update.message.reply_text("⏳ 이전 요청을 처리 중이에요.")
+        return
+
+    async with lock:
+        await update.message.reply_text("💾 대화 내용을 분석하는 중...")
+
+        # 현재 세션 히스토리 조회
+        session_id = db.get_or_create_session(user_id)
+        messages = db.get_session_messages(session_id, limit=50)
+
+        if not messages:
+            await update.message.reply_text("⚠️ 현재 세션에 대화 내용이 없어요. 먼저 /lyrics 나 /chord 로 작업해보세요!")
+            return
+
+        # 가사 / 코드 추출
+        lyrics = _extract_lyrics(messages)
+        chords = _extract_chords(messages)
+
+        if not lyrics and not chords:
+            await update.message.reply_text(
+                "⚠️ 대화에서 가사나 코드 진행을 찾지 못했어요.\n"
+                "/lyrics 로 가사를 생성하거나 /chord 로 코드 진행을 만든 후 다시 시도해주세요."
+            )
+            return
+
+        # 다음 곡 번호 계산 + 디렉토리 생성
+        next_num = _next_song_number()
+        # 곡 이름에서 파일시스템 안전 문자만 허용
+        safe_name = re.sub(r'[^\w가-힣\s-]', '', song_name).replace(' ', '_') or "untitled"
+        song_dir = SONGS_DIR / f"{next_num:02d}_{safe_name}"
+
+        try:
+            song_dir.mkdir(parents=True, exist_ok=True)
+
+            # concept.md 저장
+            concept_content = _build_concept(song_name, messages, bool(lyrics), bool(chords))
+            (song_dir / "concept.md").write_text(concept_content, encoding="utf-8")
+
+            saved_files = ["concept.md"]
+
+            # lyrics_v1.md 저장
+            if lyrics:
+                lyrics_header = f"# {song_name}\n\n> 텔레그램 /save로 자동 저장\n\n---\n\n"
+                (song_dir / "lyrics_v1.md").write_text(lyrics_header + lyrics + "\n", encoding="utf-8")
+                saved_files.append("lyrics_v1.md")
+
+            # chord_ref.md 저장
+            if chords:
+                chord_header = f"# {song_name} — 코드 진행 레퍼런스\n\n"
+                (song_dir / "chord_ref.md").write_text(chord_header + chords + "\n", encoding="utf-8")
+                saved_files.append("chord_ref.md")
+
+            # 결과 메시지
+            files_str = "\n".join(f"  📄 {f}" for f in saved_files)
+            await update.message.reply_text(
+                f"💾 저장 완료! songs/{song_dir.name}/\n\n"
+                f"{files_str}\n\n"
+                f"{'🎤 가사 저장됨' if lyrics else '⬜ 가사 없음'}\n"
+                f"{'🎹 코드 진행 저장됨' if chords else '⬜ 코드 진행 없음'}\n\n"
+                f"다음 단계: concept.md를 보완하고 Suno 프롬프트를 작성해보세요!"
+            )
+            logger.info("곡 저장 완료: %s (%s)", song_dir.name, ", ".join(saved_files))
+
+        except Exception as e:
+            logger.error("곡 저장 오류: %s", e)
+            await update.message.reply_text(f"⚠️ 저장 실패: {e}")
+
+
+# ---------------------------------------------------------------------------
 # Stage 2: /daily 음악 퀴즈
 # ---------------------------------------------------------------------------
 async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -855,6 +1070,7 @@ def main() -> None:
     app.add_handler(CommandHandler("library", cmd_library))
     app.add_handler(CommandHandler("export", cmd_export))
     app.add_handler(CommandHandler("remix", cmd_remix))
+    app.add_handler(CommandHandler("save", cmd_save))
     app.add_handler(CommandHandler("daily", cmd_daily))
     app.add_handler(CommandHandler("quiz", cmd_quiz))
     app.add_handler(CommandHandler("suno", cmd_suno))
