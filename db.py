@@ -336,3 +336,84 @@ def get_idea_by_id(idea_id: int) -> dict | None:
         return None
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Suno 곡 메타데이터
+# ---------------------------------------------------------------------------
+def save_suno_song(
+    user_id: int,
+    title: str,
+    song_id: str,
+    style: str = "",
+    lyrics: str = "",
+) -> int:
+    """Suno 곡 메타데이터 저장."""
+    conn = _get_conn()
+    try:
+        cursor = conn.execute(
+            "INSERT INTO suno_songs (user_id, title, song_id, style, lyrics) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, title, song_id, style, lyrics),
+        )
+        conn.commit()
+        return cursor.lastrowid or 0
+    except sqlite3.Error as e:
+        logger.error("Suno 곡 저장 오류: %s", e)
+        return 0
+    finally:
+        conn.close()
+
+
+def update_suno_status(
+    song_id: str,
+    status: str,
+    local_path: str | None = None,
+    drive_url: str | None = None,
+    duration_sec: float | None = None,
+) -> None:
+    """Suno 곡 상태 업데이트."""
+    conn = _get_conn()
+    try:
+        conn.execute(
+            "UPDATE suno_songs SET status=?, local_path=?, drive_url=?, duration_sec=? "
+            "WHERE song_id=?",
+            (status, local_path, drive_url, duration_sec, song_id),
+        )
+        conn.commit()
+    except sqlite3.Error as e:
+        logger.error("Suno 상태 업데이트 오류: %s", e)
+    finally:
+        conn.close()
+
+
+def get_suno_songs(user_id: int, limit: int = 20) -> list[dict]:
+    """사용자의 Suno 곡 목록."""
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT id, title, song_id, status, local_path, drive_url, duration_sec, created_at "
+            "FROM suno_songs ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    except sqlite3.Error as e:
+        logger.error("Suno 곡 조회 오류: %s", e)
+        return []
+    finally:
+        conn.close()
+
+
+def get_suno_song(song_id: str) -> dict | None:
+    """song_id로 Suno 곡 조회."""
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM suno_songs WHERE song_id = ?", (song_id,)
+        ).fetchone()
+        return dict(row) if row else None
+    except sqlite3.Error as e:
+        logger.error("Suno 곡 조회 오류: %s", e)
+        return None
+    finally:
+        conn.close()
