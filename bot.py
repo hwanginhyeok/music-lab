@@ -975,8 +975,6 @@ async def cmd_suno(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         f"⏳ 2~5분 소요됩니다..."
     )
 
-    loop = asyncio.get_event_loop()
-
     async with _suno_semaphore:
         try:
             from suno_client import SunoClient, SunoError
@@ -1005,7 +1003,7 @@ async def cmd_suno(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 finally:
                     client.close()
 
-            song_id, path, drive_url, num_songs = await loop.run_in_executor(None, _generate)
+            song_id, path, drive_url, num_songs = await asyncio.to_thread(_generate)
 
             result_text = f"✅ 곡 생성 완료!\n🎵 {title} ({num_songs}곡)"
             if drive_url:
