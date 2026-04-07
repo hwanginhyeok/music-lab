@@ -4,15 +4,9 @@
 
 | # | 작업 | 상태 | 비고 |
 |---|------|------|------|
-| 1-1 | 텔레그램 봇 기본 동작 확인 | 진행 | CLI OAuth 방식 |
+| 1-1 | 텔레그램 봇 기본 동작 | ✅ 완료 | CLI OAuth, 히스토리, per-user lock, semaphore 모두 구현 |
 | 1-2 | Phase 1 학습 커리큘럼 설계 | 예정 | 코드 진행 + Suno 연계 |
 | 1-3 | MIDI 생성 품질 개선 | 예정 | 멀티트랙, 드럼, 베이스 |
-
-## 사용자 액션 대기
-
-| # | 작업 | 남은 사용자 액션 |
-|---|------|-----------------|
-| 1-1 | 봇 테스트 | 텔레그램에서 /start, /chord, /midi 테스트 |
 
 ## 작업 현황 (백로그)
 
@@ -30,15 +24,15 @@
 
 ## TODO (CEO 리뷰에서 도출, 2026-03-28)
 
-| # | 작업 | 우선순위 | Effort | 비고 |
-|---|------|----------|--------|------|
-| T-1 | Claude CLI 히스토리 주입 POC 검증 | P0 | S | `claude -p`에 수동 히스토리 넣어 멀티턴 동작 확인. 실패 시 전체 플랜 재설계 |
-| T-2 | per-user rate limit (동시 요청 lock) | P1 | S | 한 사용자의 요청 처리 중이면 "처리 중" 메시지. subprocess 폭발 방지 |
-| T-3 | npx 버전 고정 | P2 | S | `@anthropic-ai/claude-code@x.x.x`으로 핀. 사일런트 브레이킹 체인지 방지 |
-| T-4 | FluidSynth soundfont 경로 관리 | P2 | S | .env에 SOUNDFONT_PATH. ~140MB GM soundfont 필요. 미설치 시 .mid fallback |
-| T-5 | Claude CLI `--bare` 플래그 추가 | P0 | S | `--bare --tools "" --no-session-persistence` 필수. CLAUDE.md 자동로딩 방지, 툴 비활성화(보안), 세션파일 누적 방지, cold start 단축 |
-| T-6 | 글로벌 동시성 캡 (semaphore) | P2 | S | asyncio.Semaphore(2)로 전체 동시 Claude 프로세스 제한. 개발 중 메시지 연타 시 OOM 방지 |
-| T-7 | /remix용 midi_json 컬럼 추가 | P1 | S | messages 테이블에 midi_json TEXT 컬럼. 원본 JSON 보존해야 /remix에서 재사용 가능 |
+| # | 작업 | 우선순위 | Effort | 상태 | 비고 |
+|---|------|----------|--------|------|------|
+| T-1 | Claude CLI 히스토리 주입 POC 검증 | P0 | S | ✅ 완료 | `format_context`로 히스토리 주입, 멀티턴 동작 확인됨 |
+| T-2 | per-user rate limit (동시 요청 lock) | P1 | S | ✅ 완료 | `_user_locks` + "처리 중" 메시지 구현 |
+| T-3 | npx 버전 고정 | P2 | S | ✅ 완료 | `@anthropic-ai/claude-code@2.1.91`로 핀 (2026-04-03) |
+| T-4 | FluidSynth soundfont 경로 관리 | P2 | S | ✅ 완료 | `audio.py`에 `SOUNDFONT_PATH` 환경변수 + 폴백 경로 |
+| T-5 | Claude CLI `--bare` 플래그 추가 | P0 | S | 🔒 보류 | `--bare`는 OAuth 비활성화 → API key 전환 시 적용. 현재 `--tools "" --no-session-persistence --system-prompt` 조합으로 충분 |
+| T-6 | 글로벌 동시성 캡 (semaphore) | P2 | S | ✅ 완료 | `asyncio.Semaphore(2)` 구현 |
+| T-7 | /remix용 midi_json 컬럼 추가 | P1 | S | ✅ 완료 | messages + ideas 테이블에 `midi_json TEXT` 컬럼 |
 
 ## 완료
 
@@ -57,3 +51,9 @@
 | N-10 | YouTube 업로드 파이프라인 end-to-end | 2026-03-31 | 곡 다운로드 → MP4 변환 → YouTube 업로드 성공 |
 | N-11 | lyrics_v2.md 삭제 | 2026-03-31 | lyrics_v1.md가 최종 확정본 |
 | N-12 | Suno 원스택 전환 — 후처리 파이프라인 삭제 | 2026-03-29 | mix_stems.py, process.py, MIDI 데모 제거 |
+| T-1 | Claude CLI 히스토리 주입 POC | 2026-03-28 | format_context로 멀티턴 대화 동작 |
+| T-2 | per-user rate limit | 2026-03-28 | _user_locks + "처리 중" 메시지 |
+| T-3 | npx 버전 고정 @2.1.91 | 2026-04-03 | 사일런트 브레이킹 체인지 방지 |
+| T-4 | FluidSynth soundfont 경로 관리 | 2026-03-28 | SOUNDFONT_PATH 환경변수 + 시스템 경로 폴백 |
+| T-6 | 글로벌 동시성 캡 (Semaphore) | 2026-03-28 | asyncio.Semaphore(2) |
+| T-7 | /remix용 midi_json 컬럼 | 2026-03-28 | messages + ideas 테이블 |
