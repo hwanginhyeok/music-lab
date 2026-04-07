@@ -65,23 +65,28 @@ music-lab/
 ├── client_secrets.json    ← YouTube OAuth 클라이언트 시크릿 (.gitignore)
 ├── token.json             ← YouTube OAuth 토큰 (.gitignore)
 ├── data/                  ← SQLite DB + MIDI + Suno 다운로드 (.gitignore)
+├── CURRENT_TASK.md        ← 진행 중 태스크
+├── PREPARED_TASK.md       ← 준비된 태스크 (P1/P2/P3)
+├── FINISHED_TASK.md       ← 완료된 태스크
+├── DIFFICULTY.md          ← 기술 난제 & 노하우
+├── TASK_ARCHIVE/          ← 월별 완료 태스크 아카이브
 ├── songs/                 ← 곡별 디렉토리 (컨셉, 가사, Suno 프롬프트)
 │   ├── 01_봄이라고_부를게/
 │   ├── 02_너를_다시/
+│   ├── 02_test_jazz/
 │   └── template/          ← 워크플로우 템플릿
 ├── scripts/
 │   ├── publish.py         ← YouTube 게시 오케스트레이터
 │   ├── youtube_upload.py  ← YouTube Data API v3 업로드
 │   ├── drive_to_youtube.py ← Google Drive → YouTube 파이프라인
 │   ├── create_video.py    ← 커버 이미지 + 오디오 → MP4 영상 (ffmpeg)
+│   ├── create_making_video.py ← 메이킹 영상 (스크린샷 + TTS + BGM)
 │   ├── generate_thumbnail.py ← YouTube 썸네일 자동 생성 (Pillow)
 │   ├── jazz_pipeline.py   ← 재즈 곡 자동 생성 파이프라인
 │   └── lyrics_to_srt.py   ← 가사 → SRT 자막 변환
 ├── docs/
 │   ├── suno_guide.md      ← Suno 프롬프트 가이드
-│   ├── 작사가/            ← 작사법 분석 (김이나)
-│   └── 프로젝트/
-│       └── TASK.md        ← 태스크 관리
+│   └── 작사가/            ← 작사법 분석 (김이나)
 ├── tests/                 ← pytest 테스트
 └── logs/                  ← 실행 로그
 ```
@@ -142,16 +147,12 @@ db.py → suno_songs 테이블에 메타데이터 저장
 
 ## 서비스 운영
 
-| 항목 | 설명 |
-|------|------|
-| 서비스 | `music-bot.service` (systemd user service) |
-| 서비스 파일 | `~/.config/systemd/user/music-bot.service` |
-| 시작 | `systemctl --user start music-bot` |
-| 중지 | `systemctl --user stop music-bot` |
-| 재시작 | `systemctl --user restart music-bot` |
-| 상태 확인 | `systemctl --user status music-bot` |
-| 로그 | `journalctl --user -u music-bot -f` |
-| 자동 재시작 | `Restart=always, RestartSec=5` |
+> SSOT: `/home/window11/project-manager/projects.yaml` 참조 (music-lab → services: music-bot)
+
+```bash
+systemctl --user restart music-bot   # 봇 코드 변경 후 재시작
+journalctl --user -u music-bot -f    # 로그 확인
+```
 
 ## 에이전트 (`.claude/agents/`)
 
