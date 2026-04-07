@@ -2,6 +2,9 @@
 
 > AI 작사/작곡/MIDI 생성 + Suno 연동 + YouTube 게시 프로젝트. 텔레그램 봇으로 Claude와 대화하며 음악을 배우고 만든다.
 
+## Tasks
+- [CURRENT_TASK.md](CURRENT_TASK.md) | [PREPARED_TASK.md](PREPARED_TASK.md) | [FINISHED_TASK.md](FINISHED_TASK.md)
+
 ---
 
 ## Commands
