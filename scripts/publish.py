@@ -124,6 +124,22 @@ def detect_audio_format(audio_path: Path) -> str:
     return "unknown"
 
 
+def find_srt(audio_path: Path, song_dir: Path | None = None) -> Path | None:
+    """SRT 자막 파일 탐색."""
+    candidates = []
+    # 오디오 파일 옆 동명 SRT
+    candidates.append(audio_path.with_suffix(".srt"))
+    if song_dir:
+        candidates.extend([
+            song_dir / "lyrics.srt",
+            song_dir / "video" / "lyrics.srt",
+        ])
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
+
 def find_cover_image(audio_path: Path, song_dir: Path | None = None) -> Path | None:
     """커버 이미지 탐색. Suno 다운로드 커버 또는 곡 디렉토리 커버."""
     candidates = []
@@ -286,6 +302,9 @@ def publish(
     if not cover_image:
         cover_image = find_cover_image(audio_path, song_dir)
 
+    # ---- SRT 자막 탐색 ----
+    srt_path = find_srt(audio_path, song_dir)
+
     # ---- 1. 썸네일 생성 ----
     print("\n" + "-" * 40)
     print("  [1/3] 썸네일 생성")
@@ -327,6 +346,8 @@ def publish(
             video_args += ["--title", title]
         if audio_path and audio_path != song_dir / "release" / "final.wav":
             video_args += ["--audio", str(audio_path)]
+        if srt_path:
+            video_args += ["--srt", str(srt_path)]
         result["steps"]["video"] = run_script("create_video.py", video_args)
     else:
         # 직접 모드: create_video.py에 모든 경로 전달
@@ -338,6 +359,8 @@ def publish(
         ]
         if title:
             video_args += ["--title", title]
+        if srt_path:
+            video_args += ["--srt", str(srt_path)]
 
         # create_video.py는 song_dir를 첫 인자로 받지만 직접 모드에서는 임시 디렉토리 사용
         temp_dir = work_dir.parent

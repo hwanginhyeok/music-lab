@@ -256,6 +256,7 @@ def main():
     parser.add_argument("--audio", help="오디오 파일 경로 (기본: release/final.wav)")
     parser.add_argument("--output", help="출력 MP4 경로 (기본: video/output.mp4)")
     parser.add_argument("--title", help="곡 제목 (이미지 없을 때 텍스트 표시)")
+    parser.add_argument("--srt", help="가사 자막 SRT 파일 경로")
     args = parser.parse_args()
 
     # ffmpeg 확인
@@ -271,12 +272,40 @@ def main():
         sys.exit(1)
 
     # 경로 결정
-    image_path = Path(args.image) if args.image else song_dir / "cover.jpg"
-    audio_path = Path(args.audio) if args.audio else song_dir / "release" / "final.wav"
+    if args.image:
+        image_path = Path(args.image)
+    else:
+        image_path = song_dir / "cover.jpg"
+        for ext in (".jpg", ".jpeg", ".png"):
+            candidate = song_dir / f"cover{ext}"
+            if candidate.is_file():
+                image_path = candidate
+                break
+
+    if args.audio:
+        audio_path = Path(args.audio)
+    else:
+        audio_path = song_dir / "release" / "final.wav"
+        if not audio_path.is_file():
+            audio_path = song_dir / "release" / "final.mp3"
+
     output_path = Path(args.output) if args.output else song_dir / "video" / "output.mp4"
 
     # 제목 결정 (인자 > manifest.json > 디렉토리 이름)
     title = args.title or load_title_from_manifest(song_dir) or song_dir.name
+
+    # SRT 자막 탐색 (인자 > song_dir/lyrics.srt > song_dir/video/lyrics.srt)
+    lyrics_srt = None
+    if args.srt:
+        lyrics_srt = Path(args.srt)
+    else:
+        for srt_candidate in [
+            song_dir / "lyrics.srt",
+            song_dir / "video" / "lyrics.srt",
+        ]:
+            if srt_candidate.is_file():
+                lyrics_srt = srt_candidate
+                break
 
     # 오디오 파일 확인
     if not audio_path.is_file():
@@ -289,10 +318,12 @@ def main():
     print(f"  곡: {title}")
     print(f"  이미지: {image_path}" + (" (없음 -> 검정 배경)" if not image_path.is_file() else ""))
     print(f"  오디오: {audio_path}")
+    if lyrics_srt:
+        print(f"  자막: {lyrics_srt}")
     print(f"  출력: {output_path}")
     print("=" * 60)
 
-    success = create_video(image_path, audio_path, output_path, title)
+    success = create_video(image_path, audio_path, output_path, title, lyrics_srt=lyrics_srt)
 
     if success:
         print("\n  영상 생성 완료!")

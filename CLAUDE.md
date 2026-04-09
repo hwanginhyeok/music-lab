@@ -52,7 +52,7 @@ python3 bridge.py search 재즈     # 키워드 검색
 ```
 music-lab/
 ├── CLAUDE.md              ← 이 파일
-├── bot.py                 ← 텔레그램 봇 (핸들러 15개)
+├── bot.py                 ← 텔레그램 봇 (핸들러 18개)
 ├── db.py                  ← SQLite 대화 히스토리 + 아이디어 + Suno 곡 메타데이터
 ├── audio.py               ← MIDI → OGG 오디오 변환 (FluidSynth)
 ├── midi_utils.py          ← 피아노롤 텍스트 시각화
@@ -61,6 +61,7 @@ music-lab/
 ├── suno_pipeline.py       ← Suno 곡 생성 파이프라인 CLI
 ├── suno_download.py       ← Suno 다운로드 파이프라인 (Clerk JWT → API 직접 호출)
 ├── drive_uploader.py      ← Google Drive 업로더 (서비스 계정 인증)
+├── requirements.txt       ← pip 의존성 목록
 ├── .env                   ← 환경변수 (TELEGRAM_BOT_TOKEN, SUNO_COOKIE 등)
 ├── client_secrets.json    ← YouTube OAuth 클라이언트 시크릿 (.gitignore)
 ├── token.json             ← YouTube OAuth 토큰 (.gitignore)
@@ -74,7 +75,8 @@ music-lab/
 │   ├── 01_봄이라고_부를게/
 │   ├── 02_너를_다시/
 │   ├── 02_test_jazz/
-│   └── template/          ← 워크플로우 템플릿
+│   ├── template/          ← 워크플로우 템플릿
+│   └── workflow_guide.md  ← 곡 작업 가이드
 ├── scripts/
 │   ├── publish.py         ← YouTube 게시 오케스트레이터
 │   ├── youtube_upload.py  ← YouTube Data API v3 업로드
@@ -83,10 +85,12 @@ music-lab/
 │   ├── create_making_video.py ← 메이킹 영상 (스크린샷 + TTS + BGM)
 │   ├── generate_thumbnail.py ← YouTube 썸네일 자동 생성 (Pillow)
 │   ├── jazz_pipeline.py   ← 재즈 곡 자동 생성 파이프라인
-│   └── lyrics_to_srt.py   ← 가사 → SRT 자막 변환
+│   ├── lyrics_to_srt.py   ← 가사 → SRT 자막 변환
+│   └── start_vnc.sh       ← VNC + Chrome 환경 실행 (Suno 수동 생성용)
 ├── docs/
 │   ├── suno_guide.md      ← Suno 프롬프트 가이드
-│   └── 작사가/            ← 작사법 분석 (김이나)
+│   ├── 작사가/            ← 작사법 분석 (김이나)
+│   └── 프로젝트/          ← 야간작업 브리핑 + 아카이브
 ├── tests/                 ← pytest 테스트
 └── logs/                  ← 실행 로그
 ```
@@ -141,8 +145,10 @@ db.py → suno_songs 테이블에 메타데이터 저장
 | `/remix [번호] [스타일]` | 기존 아이디어 스타일 변형 |
 | `/quiz` | 음악 이론 퀴즈 |
 | `/daily` | 매일 퀴즈 구독 (준비 중) |
+| `/save` | 대화 내용을 곡 파일로 저장 |
 | `/suno [프롬프트파일명]` | Suno AI로 곡 생성 |
 | `/suno_list` | 생성한 Suno 곡 목록 |
+| `/publish` | Suno 곡 YouTube 게시 |
 | 자유 대화 | 음악 관련 아무 질문 (대화 기억) |
 
 ## 서비스 운영

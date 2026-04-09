@@ -26,6 +26,6 @@
 ## 요약
 
 - **CURRENT**: 2개 (YouTube 게시, 메이킹 영상)
-- **PREPARED**: P1 3개, P2 6개, P3 2개
-- **FINISHED**: 26개
+- **PREPARED**: P1 3개, P2 3개, P3 2개
+- **FINISHED**: 34개
 - **DIFFICULTY**: 3개
