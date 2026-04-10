@@ -27,9 +27,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from midiutil import MIDIFile
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -195,7 +196,7 @@ def format_context(history: list[dict], current_message: str) -> str:
 async def ask_claude(
     message: str,
     history: list[dict] | None = None,
-    timeout: int = 120,
+    timeout: int = 300,  # 5분 (복잡한 MIDI 생성 대응)
 ) -> str:
     """Claude CLI로 음악 대화. 로컬 OAuth 인증 사용."""
     prompt_text = format_context(history or [], message)
@@ -611,10 +612,176 @@ async def cmd_theory(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def _handle_suno_natural_command(update: Update, text: str) -> None:
+    """Suno 자연어 명령 처리.
+
+    "suno로 노래 만들어줘", "곡 생성해줘" 등 → 프롬프트 파일 선택 메뉴 전송
+    """
+    if not await _check_auth(update):
+        return
+
+    # Suno semaphore 체크
+    if _suno_semaphore.locked():
+        await update.message.reply_text(
+            "⏳ Suno 생성이 진행 중입니다. 완료 후 다시 시도해주세요."
+        )
+        return
+
+    # songs/ 폴더 스캔
+    songs_dir = Path("songs")
+    if not songs_dir.exists():
+        await update.message.reply_text("songs/ 폴더를 찾을 수 없습니다.")
+        return
+
+    # 프롬프트 파일 목록 수집
+    prompt_files = []
+    for song_dir in sorted(songs_dir.iterdir()):
+        if not song_dir.is_dir() or song_dir.name == "template":
+            continue
+        for f in song_dir.iterdir():
+            if f.suffix == ".md" and "suno_prompt" in f.stem:
+                prompt_files.append({
+                    "path": f,
+                    "song_dir": song_dir.name,
+                    "name": f.stem.replace("_", " "),
+                })
+
+    if not prompt_files:
+        await update.message.reply_text(
+            "프롬프트 파일을 찾을 수 없습니다.\n"
+            "songs/{곡명}/suno_prompt*.md 파일이 필요합니다."
+        )
+        return
+
+    # 인라인 키보드 생성 (최대 10개)
+    buttons = []
+    for i, pf in enumerate(prompt_files[:10]):
+        # 콜백 데이터: "suno:{파일경로}"
+        callback_data = f"suno:{pf['path']}"
+        button_label = f"🎵 {pf['song_dir'].replace('_', ' ')}"
+        buttons.append([InlineKeyboardButton(button_label, callback_data=callback_data)])
+
+    # 여러 개면 "취소" 버튼 추가
+    if len(prompt_files) > 1:
+        buttons.append([InlineKeyboardButton("❌ 취소", callback_data="suno:cancel")])
+
+    reply_markup = InlineKeyboardMarkup(buttons)
+
+    await update.message.reply_text(
+        f"🎵 Suno 곡 생성을 시작합니다!\n\n"
+        f"프롬프트 파일을 선택해주세요 ({len(prompt_files)}개):\n",
+        reply_markup=reply_markup,
+    )
+
+
+async def _handle_suno_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Suno 인라인 키보드 콜백 처리."""
+    query = update.callback_query
+    if not query:
+        return
+
+    await query.answer()
+
+    # 취소
+    if query.data == "suno:cancel":
+        await query.edit_message_text("❌ 취소되었습니다.")
+        return
+
+    # 프롬프트 파일 경로 추출
+    prompt_path_str = query.data.replace("suno:", "", 1)
+    prompt_path = Path(prompt_path_str)
+
+    if not prompt_path.exists():
+        await query.edit_message_text(f"❌ 파일을 찾을 수 없습니다: {prompt_path}")
+        return
+
+    # cmd_suno 로직 재사용
+    user_id = update.effective_user.id if query.message else None
+    if not user_id:
+        await query.edit_message_text("❌ 사용자 정보를 찾을 수 없습니다.")
+        return
+
+    try:
+        from suno_pipeline import parse_prompt_file
+        style, lyrics = parse_prompt_file(str(prompt_path))
+    except Exception as e:
+        await query.edit_message_text(f"❌ 프롬프트 파싱 실패: {e}")
+        return
+
+    if not style or not lyrics:
+        await query.edit_message_text("❌ Style 또는 Lyrics가 비어있습니다.")
+        return
+
+    title = prompt_path.parent.name.replace("_", " ")
+    await query.edit_message_text(
+        f"🎵 Suno 곡 생성 중: {title}\n"
+        f"Style: {style[:60]}...\n"
+        f"⏳ 2~5분 소요됩니다..."
+    )
+
+    async with _suno_semaphore:
+        try:
+            from suno_client import SunoClient, SunoError
+
+            def _generate():
+                client = SunoClient()
+                try:
+                    song_urls = client.generate(lyrics=lyrics, style=style, title=title)
+                    song_id = song_urls[0].rstrip("/").split("/")[-1]
+                    db.save_suno_song(user_id, title, song_id, style, lyrics)
+
+                    path = client.download(song_urls[0])
+                    drive_url = ""
+                    try:
+                        from drive_uploader import DriveUploader
+                        uploader = DriveUploader()
+                        drive_url = uploader.upload(str(path))
+                    except Exception:
+                        pass
+                    db.update_suno_status(
+                        song_id, "complete",
+                        local_path=str(path),
+                        drive_url=drive_url,
+                    )
+                    return song_id, path, drive_url, len(song_urls)
+                finally:
+                    client.close()
+
+            song_id, path, drive_url, num_songs = await asyncio.to_thread(_generate)
+
+            result_text = f"✅ 곡 생성 완료!\n🎵 {title} ({num_songs}곡)"
+            if drive_url:
+                result_text += f"\n☁️ {drive_url}"
+
+            await query.edit_message_text(result_text)
+
+            # 오디오 전송
+            if query.message:
+                with open(path, "rb") as audio_file:
+                    await query.message.reply_audio(
+                        audio=audio_file,
+                        title=title,
+                        performer="Suno AI",
+                    )
+
+        except Exception as e:
+            logger.error("Suno 파이프라인 오류: %s", e, exc_info=True)
+            await query.edit_message_text(f"❌ Suno 생성 실패: {e}")
+
+
 async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """일반 메시지 — 자유 대화."""
     if not update.message or not update.message.text:
         return
+
+    text = update.message.text.lower()
+
+    # Suno 자연어 명령 감지
+    suno_keywords = ["suno", "노래 만들", "곡 생성", "음악 만들", "suno.ai"]
+    if any(kw in text for kw in suno_keywords):
+        await _handle_suno_natural_command(update, text)
+        return
+
     await _handle_with_memory(update, update.message.text)
 
 
@@ -1492,6 +1659,167 @@ async def _run_publish_pipeline(
 
 
 # ---------------------------------------------------------------------------
+# Stage 4: YouTube 관리 (/youtube_list, /youtube_delete, /youtube_stats)
+# ---------------------------------------------------------------------------
+async def cmd_youtube_list(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """YouTube 업로드된 곡 목록 조회."""
+    if not await _check_auth(update):
+        return
+
+    user_id = update.effective_user.id if update.effective_user else None
+    if not user_id:
+        return
+
+    try:
+        # DB에서 YouTube URL이 있는 곡 목록 조회
+        songs = db.get_suno_songs(user_id, limit=50)
+
+        # YouTube URL 필터링
+        youtube_songs = []
+        for song in songs:
+            drive_url = song.get("drive_url", "")
+            if drive_url and "youtube.com/watch" in drive_url:
+                video_id = drive_url.split("v=")[-1].split("&")[0]
+                youtube_songs.append({
+                    "title": song.get("title", "무제"),
+                    "video_id": video_id,
+                    "url": drive_url,
+                    "status": song.get("status", ""),
+                })
+
+        if not youtube_songs:
+            await update.message.reply_text(
+                "📋 YouTube에 업로드된 곡이 없습니다.\n\n"
+                "/publish로 곡을 먼저 게시하세요."
+            )
+            return
+
+        # 목록 포맷팅
+        lines = ["🎬 YouTube 업로드 곡 목록\n"]
+        for i, song in enumerate(youtube_songs, 1):
+            lines.append(f"{i}. {song['title']}")
+            lines.append(f"   ID: {song['video_id']}")
+            lines.append(f"   {song['url']}")
+
+        lines.append(f"\n총 {len(youtube_songs)}곡")
+        lines.append("\n삭제: /youtube_delete {video_id}")
+
+        await update.message.reply_text("\n".join(lines))
+
+    except Exception as e:
+        logger.error("YouTube 목록 조회 오류: %s", e)
+        await update.message.reply_text(f"❌ 목록 조회 실패: {e}")
+
+
+async def cmd_youtube_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """YouTube 곡 삭제. /youtube_delete {video_id}"""
+    if not await _check_auth(update):
+        return
+
+    video_id = " ".join(ctx.args) if ctx.args else ""
+    if not video_id:
+        await update.message.reply_text(
+            "사용법:\n/youtube_delete {video_id}\n\n"
+            "예: /youtube_delete abc123xyz\n\n"
+            "video_id는 /youtube_list로 확인하세요."
+        )
+        return
+
+    try:
+        # YouTube Data API로 삭제
+        from google.oauth2.credentials import Credentials
+        from googleapiclient.discovery import build
+
+        token_path = Path("token.json")
+        if not token_path.is_file():
+            await update.message.reply_text("❌ YouTube 인증 토큰이 없습니다.")
+            return
+
+        creds = Credentials.from_authorized_user_file(str(token_path))
+        youtube = build("youtube", "v3", credentials=creds)
+
+        # 동영상 삭제
+        youtube.videos().delete(id=video_id).execute()
+
+        # DB 업데이트
+        # (drive_url에서 youtube 링크 제거)
+
+        await update.message.reply_text(f"✅ 삭제 완료: {video_id}")
+
+    except Exception as e:
+        logger.error("YouTube 삭제 오류: %s", e)
+        await update.message.reply_text(f"❌ 삭제 실패: {e}")
+
+
+async def cmd_youtube_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """YouTube 통계."""
+    if not await _check_auth(update):
+        return
+
+    user_id = update.effective_user.id if update.effective_user else None
+    if not user_id:
+        return
+
+    try:
+        songs = db.get_suno_songs(user_id)
+
+        youtube_count = 0
+        total_duration = 0
+
+        for song in songs:
+            drive_url = song.get("drive_url", "")
+            if drive_url and "youtube.com/watch" in drive_url:
+                youtube_count += 1
+                if song.get("duration_sec"):
+                    total_duration += song["duration_sec"]
+
+        hours = total_duration / 3600
+        lines = [
+            "📊 YouTube 통계\n",
+            f"🎵 업로드 곡: {youtube_count}곡",
+            f"⏱️ 총 재생시간: {total_duration:.0f}초 ({hours:.1f}시간)",
+        ]
+
+        await update.message.reply_text("\n".join(lines))
+
+    except Exception as e:
+        logger.error("YouTube 통계 오류: %s", e)
+        await update.message.reply_text(f"❌ 통계 조회 실패: {e}")
+
+
+async def _handle_youtube_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """YouTube 인라인 키보드 콜백 처리."""
+    query = update.callback_query
+    if not query:
+        return
+
+    await query.answer()
+
+    if query.data == "youtube:cancel":
+        await query.edit_message_text("❌ 취소되었습니다.")
+        return
+
+    # video_id 추출
+    video_id = query.data.replace("youtube:delete:", "", 1)
+
+    try:
+        from google.oauth2.credentials import Credentials
+        from googleapiclient.discovery import build
+
+        token_path = Path("token.json")
+        creds = Credentials.from_authorized_user_file(str(token_path))
+        youtube = build("youtube", "v3", credentials=creds)
+
+        youtube.videos().delete(id=video_id).execute()
+
+        await query.edit_message_text(f"✅ 삭제 완료: {video_id}")
+
+    except Exception as e:
+        logger.error("YouTube 콜백 삭제 오류: %s", e)
+        await query.edit_message_text(f"❌ 삭제 실패: {e}")
+
+
+# ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
 def main() -> None:
@@ -1524,6 +1852,11 @@ def main() -> None:
     app.add_handler(CommandHandler("suno", cmd_suno))
     app.add_handler(CommandHandler("suno_list", cmd_suno_list))
     app.add_handler(CommandHandler("publish", cmd_publish))
+    app.add_handler(CommandHandler("youtube_list", cmd_youtube_list))
+    app.add_handler(CommandHandler("youtube_delete", cmd_youtube_delete))
+    app.add_handler(CommandHandler("youtube_stats", cmd_youtube_stats))
+    app.add_handler(CallbackQueryHandler(_handle_suno_callback, pattern="^suno:"))
+    app.add_handler(CallbackQueryHandler(_handle_youtube_callback, pattern="^youtube:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("폴링 시작... (대화 기억 활성, Claude CLI OAuth 사용)")
