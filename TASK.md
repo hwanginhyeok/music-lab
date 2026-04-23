@@ -22,10 +22,12 @@
 | 기능 | 3 | `3-1` 대화 히스토리 |
 | 콘텐츠/게시 | 4 | `4-1` YouTube 게시 |
 | 음악 제작 | 5 | `5-1` Suno 프롬프트 |
+| YouTube 관리 | 6 | `6-1` YouTube 관리 파이프라인 |
+| 자동 문구 생성 | 7 | `7-1` YouTube 게시 문구 자동 생성 |
 
 ## 요약
 
-- **CURRENT**: 2개 (YouTube 게시, 메이킹 영상)
-- **PREPARED**: P1 3개, P2 3개, P3 2개
-- **FINISHED**: 34개
+- **CURRENT**: 3개 (4-3 너를 다시, 7-1 YouTube 문구 자동 생성, 6-1 YouTube 관리)
+- **PREPARED**: P1 3개(+1 취소), P2 3개, P3 2개
+- **FINISHED**: 35개
 - **DIFFICULTY**: 3개
