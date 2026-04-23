@@ -28,6 +28,7 @@
 ## 요약
 
 - **CURRENT**: 3개 (4-3 너를 다시, 7-1 YouTube 문구 자동 생성, 6-1 YouTube 관리)
-- **PREPARED**: P1 3개(+1 취소), P2 3개, P3 2개
+- **PREPARED**: P1 9개(+1 취소) — PIPE-F05/F10/F04/F01/F02/F03 신규 6건 + 기존 3건, P2 3개, P3 2개
 - **FINISHED**: 35개
 - **DIFFICULTY**: 3개
+- **Plan**: [production_pipeline_v2.md](docs/plans/production_pipeline_v2.md) — Phase 1~3 구현 계획
