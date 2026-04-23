@@ -249,10 +249,120 @@ class SunoClient:
         """남은 크레딧 (API)."""
         return self._get_api().get_credits()
 
-    def generate(self, lyrics: str, style: str, title: str = "") -> list[str]:
-        """곡 생성 → song URL 리스트 반환 (Suno는 2곡 동시 생성)."""
+    def _select_model(self, version: str) -> bool:
+        """Advanced Mode 모델 드롭다운에서 버전 선택. 실패 시 스크린샷 + WARN + False 반환."""
+        driver = self._driver
+        if not driver or not version:
+            return False
+
+        from selenium.webdriver.common.by import By
+
+        debug_dir = Path("data/debug")
+        debug_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            # (a) 모델 드롭다운 버튼 후보 — 'v5', 'v4', 'Model', 'Chirp'
+            dropdown = None
+            selectors_open = [
+                "//button[.//text()[contains(., 'v5')] or .//text()[contains(., 'v4')]]",
+                "//button[contains(., 'Model') or contains(., 'Chirp')]",
+                "//button[@aria-haspopup='listbox' or @aria-haspopup='menu']",
+            ]
+            for xp in selectors_open:
+                try:
+                    for el in driver.find_elements(By.XPATH, xp):
+                        if el.is_displayed():
+                            dropdown = el
+                            break
+                    if dropdown:
+                        break
+                except Exception:
+                    continue
+
+            if not dropdown:
+                ts = int(time.time())
+                driver.save_screenshot(
+                    str(debug_dir / f"model_select_fail_dropdown_{ts}.png")
+                )
+                logger.warning(
+                    "모델 드롭다운 못 찾음 — 기본 모델로 진행 (screenshot 저장)"
+                )
+                return False
+
+            dropdown.click()
+            time.sleep(1)
+
+            # (b) 옵션 찾기 — v5.5 / v5 / v4.5 / v4 / v3.5
+            target_texts = [version, version.replace("v", "V"), version.upper()]
+            if version == "v5.5":
+                target_texts += ["5.5", "Chirp v5.5", "Chirp 5.5"]
+
+            option = None
+            option_xpaths = [
+                "//div[@role='option']",
+                "//li[@role='option']",
+                "//button[@role='menuitem']",
+                "//div[@role='menuitem']",
+                "//span[@role='option']",
+            ]
+            for xp in option_xpaths:
+                try:
+                    for el in driver.find_elements(By.XPATH, xp):
+                        if not el.is_displayed():
+                            continue
+                        text = (el.text or "").strip()
+                        if any(t in text for t in target_texts):
+                            option = el
+                            break
+                    if option:
+                        break
+                except Exception:
+                    continue
+
+            if not option:
+                ts = int(time.time())
+                driver.save_screenshot(
+                    str(debug_dir / f"model_select_fail_option_{ts}.png")
+                )
+                logger.warning(
+                    "모델 옵션 %s 못 찾음 — 드롭다운은 열렸으나 옵션 매칭 실패 (screenshot 저장)",
+                    version,
+                )
+                # 드롭다운 닫기
+                try:
+                    driver.execute_script("document.body.click();")
+                except Exception:
+                    pass
+                return False
+
+            option.click()
+            time.sleep(1)
+            logger.info("모델 선택 완료: %s", version)
+            return True
+        except Exception as e:
+            ts = int(time.time())
+            try:
+                driver.save_screenshot(
+                    str(debug_dir / f"model_select_fail_exc_{ts}.png")
+                )
+            except Exception:
+                pass
+            logger.warning("모델 선택 중 예외 — 기본 모델로 진행: %s", e)
+            return False
+
+    def generate(
+        self,
+        lyrics: str,
+        style: str,
+        title: str = "",
+        model: str = "v5.5",
+    ) -> list[str]:
+        """곡 생성 → song URL 리스트 반환 (Suno는 2곡 동시 생성).
+
+        model: v3.5 / v4 / v4.5 / v5 / v5.5. 기본 v5.5. UI 선택 실패 시 기본 모델로 폴백.
+        """
         driver = self._get_driver()
-        logger.info("Suno 곡 생성 시작: %s", title or "무제")
+        logger.info("Suno 곡 생성 시작: %s (model=%s)", title or "무제", model)
 
         # 페이지 상태 초기화 — 다른 페이지 갔다가 Create로 복귀
         driver.get("https://suno.com/explore")
@@ -289,6 +399,10 @@ class SunoClient:
             logger.info("Advanced 모드 활성화")
         except Exception:
             logger.info("이미 Advanced 모드")
+
+        # 모델 선택 (실패 시 기본 모델로 폴백 — 파이프라인 중단하지 않음)
+        if model:
+            self._select_model(model)
 
         # JS로 가사 + 스타일 + 제목 입력
         try:

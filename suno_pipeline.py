@@ -47,6 +47,7 @@ def run_pipeline(
     lyrics: str,
     user_id: int = 0,
     skip_drive: bool = False,
+    model: str = "v5.5",
 ) -> bool:
     """전체 파이프라인 실행."""
     print("=" * 60)
@@ -65,7 +66,7 @@ def run_pipeline(
             print("  ❌ 크레딧 부족!")
             return False
 
-        song_urls = client.generate(lyrics=lyrics, style=style, title=title)
+        song_urls = client.generate(lyrics=lyrics, style=style, title=title, model=model)
         print(f"  ✅ {len(song_urls)}곡 생성 완료!")
         for url in song_urls:
             print(f"    → {url}")
@@ -141,6 +142,12 @@ def main():
     parser.add_argument("--lyrics", "-l", help="가사 텍스트")
     parser.add_argument("--user-id", type=int, default=0, help="사용자 ID")
     parser.add_argument("--skip-drive", action="store_true", help="Drive 업로드 스킵")
+    parser.add_argument(
+        "--model",
+        choices=["v3.5", "v4", "v4.5", "v5", "v5.5"],
+        default="v5.5",
+        help="Suno 모델 버전 (기본 v5.5)",
+    )
     args = parser.parse_args()
 
     if args.prompt_file:
@@ -172,6 +179,7 @@ def main():
         lyrics=lyrics,
         user_id=args.user_id,
         skip_drive=args.skip_drive,
+        model=args.model,
     )
     sys.exit(0 if success else 1)
 

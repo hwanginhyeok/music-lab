@@ -726,7 +726,7 @@ async def _handle_suno_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) 
             def _generate():
                 client = SunoClient()
                 try:
-                    song_urls = client.generate(lyrics=lyrics, style=style, title=title)
+                    song_urls = client.generate(lyrics=lyrics, style=style, title=title, model="v5.5")
                     song_id = song_urls[0].rstrip("/").split("/")[-1]
                     db.save_suno_song(user_id, title, song_id, style, lyrics)
 
@@ -1342,7 +1342,7 @@ async def cmd_suno(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             def _generate():
                 client = SunoClient()
                 try:
-                    song_urls = client.generate(lyrics=lyrics, style=style, title=title)
+                    song_urls = client.generate(lyrics=lyrics, style=style, title=title, model="v5.5")
                     song_id = song_urls[0].rstrip("/").split("/")[-1]
                     db.save_suno_song(user_id, title, song_id, style, lyrics)
 
