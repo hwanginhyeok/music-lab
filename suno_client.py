@@ -422,19 +422,33 @@ class SunoClient:
         existing_ids = {s["id"] for s in api.get_songs(page=0) if s.get("id")}
         logger.info("기존 곡 %d개", len(existing_ids))
 
-        # Create 버튼 클릭 (selenium element.click — 검증됨)
-        try:
-            for b in driver.find_elements(By.TAG_NAME, "button"):
-                if b.is_displayed() and b.text.strip() == "Create" and b.is_enabled():
-                    b.click()
-                    logger.info("Create 버튼 클릭")
+        # Create 버튼 클릭 (element.click 실패 시 JS click 폴백)
+        create_btn = None
+        for b in driver.find_elements(By.TAG_NAME, "button"):
+            try:
+                if not (b.is_displayed() and b.is_enabled()):
+                    continue
+                label = (b.get_attribute("aria-label") or "").lower()
+                txt = (b.text or "").strip()
+                if txt == "Create" or "create song" in label:
+                    create_btn = b
                     break
-            else:
-                raise SunoError("Create 버튼을 찾을 수 없습니다")
-        except SunoError:
-            raise
-        except Exception as e:
-            raise SunoError(f"Create 클릭 실패: {e}") from e
+            except Exception:
+                continue
+
+        if not create_btn:
+            raise SunoError("Create 버튼을 찾을 수 없습니다")
+
+        try:
+            create_btn.click()
+            logger.info("Create 버튼 클릭 (selenium)")
+        except Exception as e1:
+            logger.warning("element.click 실패 (%s) — JS click 폴백", type(e1).__name__)
+            try:
+                driver.execute_script("arguments[0].click();", create_btn)
+                logger.info("Create 버튼 클릭 (JS)")
+            except Exception as e2:
+                raise SunoError(f"Create 클릭 실패: {e2}") from e2
 
         time.sleep(3)
         if not self._wait_captcha():
