@@ -400,9 +400,16 @@ class SunoClient:
         except Exception:
             logger.info("이미 Advanced 모드")
 
-        # 모델 선택 (실패 시 기본 모델로 폴백 — 파이프라인 중단하지 않음)
-        if model:
+        # 모델 선택 (UI 기본값 v5.5 — Pro 플랜). v5.5면 스킵, 다른 버전만 드롭다운 조작.
+        # 드롭다운이 열린 채 남으면 Create 버튼을 덮어서 생성 요청 가로챔 — ESC로 강제 닫기 보장.
+        if model and model != "v5.5":
             self._select_model(model)
+        try:
+            from selenium.webdriver.common.keys import Keys
+            driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+            time.sleep(0.5)
+        except Exception:
+            pass
 
         # JS로 가사 + 스타일 + 제목 입력
         try:
