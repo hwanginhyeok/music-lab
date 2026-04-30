@@ -93,7 +93,7 @@ def _start_chrome(display: str = VNC_DISPLAY, port: int = CHROME_DEBUG_PORT):
     raise SunoError("Chrome 시작 실패")
 
 
-# 검증된 React 호환 입력 JS (input + change 이벤트 둘 다 디스패치)
+# 검증된 React 호환 입력 JS (input + change 이벤트 둘 다 디스패치) — 가사 포함 버전
 JS_SET_VALUE = """
 function setNativeValue(element, value) {
     var proto = element.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
@@ -130,6 +130,58 @@ var titleInput = document.querySelector("input[placeholder='Song Title (Optional
 if (titleInput) {
     titleInput.focus();
     setNativeValue(titleInput, arguments[2]);
+    results.title = titleInput.value;
+}
+
+// Create 버튼 상태
+var buttons = document.querySelectorAll('button');
+for (var b of buttons) {
+    if (b.textContent.trim() === 'Create') {
+        results.createEnabled = !b.disabled;
+    }
+}
+
+return results;
+"""
+
+# 인스트루멘탈 모드 전용 JS — 가사 스킵, Style + Title만 입력
+# Suno UI 변경 가능성 — 셀렉터 실패 시 디버그 스크린샷 필요
+JS_SET_VALUE_INSTRUMENTAL = """
+function setNativeValue(element, value) {
+    var proto = element.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+    var valueSetter = Object.getOwnPropertyDescriptor(proto.prototype, 'value').set;
+    var protoSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'value');
+    if (protoSetter && protoSetter.set && valueSetter !== protoSetter.set) {
+        protoSetter.set.call(element, value);
+    } else {
+        valueSetter.call(element, value);
+    }
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+var textareas = document.querySelectorAll('textarea');
+var results = {};
+results.instrumentalMode = true;
+
+// 인스트루멘탈 모드: 가사 textarea 스킵 (비어있거나 disabled 상태여야 함)
+if (textareas[0]) {
+    results.lyricsVisible = textareas[0].offsetParent !== null;
+    results.lyricsDisabled = textareas[0].disabled;
+}
+
+// textarea[1] = style of music (인스트루멘탈에서도 입력 필요)
+if (textareas[1] && textareas[1].offsetParent !== null) {
+    textareas[1].focus();
+    setNativeValue(textareas[1], arguments[0]);
+    results.style = textareas[1].value.substring(0, 30);
+}
+
+// title input
+var titleInput = document.querySelector("input[placeholder='Song Title (Optional)']");
+if (titleInput) {
+    titleInput.focus();
+    setNativeValue(titleInput, arguments[1]);
     results.title = titleInput.value;
 }
 
@@ -350,16 +402,137 @@ class SunoClient:
             logger.warning("모델 선택 중 예외 — 기본 모델로 진행: %s", e)
             return False
 
+    def _toggle_instrumental(self) -> bool:
+        """Instrumental 토글 클릭. 이미 활성화 상태면 스킵.
+
+        Suno UI 변경 가능성 — 셀렉터 실패 시 디버그 스크린샷 필요.
+
+        Returns:
+            True: 토글 활성화 성공 또는 이미 활성화됨
+            False: 토글 찾기 실패 (기본 모드로 진행)
+        """
+        from selenium.webdriver.common.by import By
+        from pathlib import Path
+
+        driver = self._driver
+        if not driver:
+            return False
+
+        debug_dir = Path("data/debug")
+        debug_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            # Instrumental 토글 셀렉터 후보들 (안정적인 순서대로 시도)
+            toggle_selectors = [
+                # (1) 버튼 텍스트로 찾기 (가장 안정적)
+                "//button[contains(text(), 'Instrumental')]",
+                # (2) aria-label로 찾기
+                "//button[@aria-label='Instrumental' or @aria-label='instrumental']",
+                # (3) 라벨+체크박스 구조
+                "//label[contains(., 'Instrumental')]//input[@type='checkbox']",
+                # (4) 버튼 내부 텍스트 (공백/대소문자 무시)
+                "//button[contains(translate(., 'INSTRUMENTAL', 'instrumental'), 'instrumental')]",
+                # (5) data-testid 속성 (Suno가 사용한다면)
+                "//button[@data-testid='instrumental-toggle']",
+                "//input[@data-testid='instrumental-checkbox']",
+            ]
+
+            toggle = None
+            for xpath in toggle_selectors:
+                try:
+                    elements = driver.find_elements(By.XPATH, xpath)
+                    for el in elements:
+                        if el.is_displayed():
+                            toggle = el
+                            logger.info("Instrumental 토글 발견 (셀렉터: %s)", xpath)
+                            break
+                    if toggle:
+                        break
+                except Exception:
+                    continue
+
+            if not toggle:
+                ts = int(time.time())
+                driver.save_screenshot(
+                    str(debug_dir / f"instrumental_toggle_not_found_{ts}.png")
+                )
+                logger.warning(
+                    "Instrumental 토글 못 찾음 — 일반 모드로 진행 (screenshot 저장)"
+                )
+                return False
+
+            # 이미 활성화 상태 확인 (aria-checked, class, checked 속성)
+            is_active = False
+            aria_checked = toggle.get_attribute("aria-checked")
+            if aria_checked is not None:
+                is_active = aria_checked.lower() == "true"
+            else:
+                # checkbox/radio type
+                checked = toggle.get_attribute("checked")
+                if checked is not None:
+                    is_active = checked.lower() == "true"
+
+            # 클래스 기반 확인 (Suno가 'active' 또는 'selected' 클래스 사용할 수 있음)
+            class_attr = toggle.get_attribute("class") or ""
+            if any(c in class_attr.lower() for c in ["active", "selected", "checked"]):
+                is_active = True
+
+            if is_active:
+                logger.info("Instrumental 토글 이미 활성화됨 — 클릭 스킵")
+                return True
+
+            # 토글 클릭
+            toggle.click()
+            time.sleep(1)
+            logger.info("Instrumental 토글 클릭 완료")
+
+            # 클릭 후 활성화 확인
+            aria_checked_after = toggle.get_attribute("aria-checked")
+            if aria_checked_after is not None:
+                is_active_after = aria_checked_after.lower() == "true"
+            else:
+                class_after = toggle.get_attribute("class") or ""
+                is_active_after = any(
+                    c in class_after.lower() for c in ["active", "selected", "checked"]
+                )
+
+            if is_active_after:
+                logger.info("Instrumental 토글 활성화 확인됨")
+                return True
+            else:
+                logger.warning("Instrumental 토글 클릭했으나 활성화 안 됨 — 일반 모드로 진행")
+                return False
+
+        except Exception as e:
+            ts = int(time.time())
+            try:
+                driver.save_screenshot(
+                    str(debug_dir / f"instrumental_toggle_exc_{ts}.png")
+                )
+            except Exception:
+                pass
+            logger.warning("Instrumental 토글 조작 중 예외 — 일반 모드로 진행: %s", e)
+            return False
+
     def generate(
         self,
         lyrics: str,
         style: str,
         title: str = "",
         model: str = "v5.5",
+        instrumental: bool = False,
     ) -> list[str]:
         """곡 생성 → song URL 리스트 반환 (Suno는 2곡 동시 생성).
 
-        model: v3.5 / v4 / v4.5 / v5 / v5.5. 기본 v5.5. UI 선택 실패 시 기본 모델로 폴백.
+        Args:
+            lyrics: 가사 텍스트 (instrumental=True时 무시됨)
+            style: Style of Music 태그
+            title: 곡 제목 (선택)
+            model: v3.5 / v4 / v4.5 / v5 / v5.5. 기본 v5.5. UI 선택 실패 시 기본 모델로 폴백.
+            instrumental: 인스트루멘탈 모드 (가사 없이 곡 생성). 기본 False.
+
+        Returns:
+            생성된 곡 URL 리스트 (보통 2개)
         """
         driver = self._get_driver()
         logger.info("Suno 곡 생성 시작: %s (model=%s)", title or "무제", model)
@@ -411,12 +584,35 @@ class SunoClient:
         except Exception:
             pass
 
-        # JS로 가사 + 스타일 + 제목 입력
+        # 인스트루멘탈 모드: 토글 클릭 (가사 입력 전에 실행해야 함)
+        if instrumental:
+            logger.info("Instrumental 모드 활성화 시도...")
+            toggle_success = self._toggle_instrumental()
+            if not toggle_success:
+                logger.warning("Instrumental 토글 실패 — 일반 모드로 진행")
+            time.sleep(1)
+
+        # JS로 가사 + 스타일 + 제목 입력 (인스트루멘털 모드면 가사 스킵)
         try:
-            result = driver.execute_script(JS_SET_VALUE, lyrics, style, title or "")
-            logger.info("입력 완료: %s", result)
+            if instrumental:
+                result = driver.execute_script(JS_SET_VALUE_INSTRUMENTAL, style, title or "")
+                logger.info("인스트루멘털 모드 입력 완료: %s", result)
+            else:
+                result = driver.execute_script(JS_SET_VALUE, lyrics, style, title or "")
+                logger.info("입력 완료: %s", result)
+
             if not result.get("createEnabled"):
                 raise SunoError("Create 버튼 비활성화 — 입력이 반영되지 않음")
+
+            # 인스트루멘털 모드 시 로그 확인: 가사 textarea 상태
+            if instrumental and result.get("instrumentalMode"):
+                lyrics_visible = result.get("lyricsVisible", True)
+                lyrics_disabled = result.get("lyricsDisabled", False)
+                logger.info(
+                    "인스트루멘털 모드 확인: 가사 textarea 보임=%s, disabled=%s",
+                    lyrics_visible, lyrics_disabled
+                )
+
         except SunoError:
             raise
         except Exception as e:

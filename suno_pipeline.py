@@ -48,8 +48,13 @@ def run_pipeline(
     user_id: int = 0,
     skip_drive: bool = False,
     model: str = "v5.5",
+    instrumental: bool = False,
 ) -> bool:
-    """전체 파이프라인 실행."""
+    """전체 파이프라인 실행.
+
+    Args:
+        instrumental: 인스트루멘털 모드 (가사 없이 곡 생성). 기본 False.
+    """
     print("=" * 60)
     print(f"🎵 Suno 곡 생성 파이프라인: {title}")
     print("=" * 60)
@@ -66,7 +71,9 @@ def run_pipeline(
             print("  ❌ 크레딧 부족!")
             return False
 
-        song_urls = client.generate(lyrics=lyrics, style=style, title=title, model=model)
+        song_urls = client.generate(
+            lyrics=lyrics, style=style, title=title, model=model, instrumental=instrumental
+        )
         print(f"  ✅ {len(song_urls)}곡 생성 완료!")
         for url in song_urls:
             print(f"    → {url}")
@@ -148,6 +155,11 @@ def main():
         default="v5.5",
         help="Suno 모델 버전 (기본 v5.5)",
     )
+    parser.add_argument(
+        "--instrumental",
+        action="store_true",
+        help="인스트루멘털 모드 (가사 없이 곡 생성)",
+    )
     args = parser.parse_args()
 
     if args.prompt_file:
@@ -160,18 +172,28 @@ def main():
         style = args.style
         lyrics = args.lyrics
     else:
-        print("❌ --prompt-file 또는 --style + --lyrics 필요")
-        sys.exit(1)
+        # 인스트루멘털 모드: --style만 있어도 OK, --lyrics는 선택사항
+        if args.instrumental and args.style:
+            style = args.style
+            lyrics = args.lyrics or ""
+        else:
+            print("❌ --prompt-file 또는 --style + --lyrics 필요 (인스트루멘털 모드: --style만 필요)")
+            sys.exit(1)
 
     if not style:
         print("❌ Style of Music 태그가 비어있습니다")
         sys.exit(1)
-    if not lyrics:
-        print("❌ 가사가 비어있습니다")
+
+    # 인스트루멘털 모드가 아닐 때만 가사 검증
+    if not args.instrumental and not lyrics:
+        print("❌ 가사가 비어있습니다 (--instrumental 플래그 없음)")
         sys.exit(1)
 
     print(f"Style: {style[:80]}...")
-    print(f"Lyrics: {lyrics[:80]}...")
+    if args.instrumental:
+        print(f"Mode: Instrumental (가사 없음)")
+    else:
+        print(f"Lyrics: {lyrics[:80]}...")
 
     success = run_pipeline(
         title=args.title,
@@ -180,6 +202,7 @@ def main():
         user_id=args.user_id,
         skip_drive=args.skip_drive,
         model=args.model,
+        instrumental=args.instrumental,
     )
     sys.exit(0 if success else 1)
 
