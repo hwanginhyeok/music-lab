@@ -2,6 +2,7 @@
 
 | # | 태스크 | 시작일 | blocked | 비고 |
 |---|--------|--------|---------|------|
+| 5-18 | '술병이 났다' 풀앨범 9곡 (3·3·3 동음 역설) | 2026-05-05 | — | Late-night smoky jazz, 색스 중심. **9트랙 v1/v2 Suno 생성 완료 (2026-05-05)**. 사용자 청취 + 선별 단계. 다음: 9번 영어 가사(Gregory Porter 결) + 시각 이미지 생성 (visual_prompts v0.2). 컨셉 v0.3, _INDEX.md 완성, GDrive md sync 완료 |
 | 7-1 | YouTube 게시 문구 자동 생성 파이프라인 | 2026-04-23 | — | P1. 곡 메타 → Claude API → 제목/설명/해시태그/타임스탬프. Phase 1 CLI → Phase 2 텔레그램 /youtube_copy → Phase 3 uploader 자동 주입 |
 | 6-1 | YouTube 관리 파이프라인 구축 | 2026-04-09 | — | /youtube_list(목록), /youtube_delete(삭제), 통계 기능 구현. 5-14 게시 완료 — 채널 콘텐츠 누적 시작, 관리 도구 우선순위 평가 필요 |
 

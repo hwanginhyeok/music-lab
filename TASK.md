@@ -27,8 +27,8 @@
 
 ## 요약
 
-- **CURRENT**: 2개 (7-1 YouTube 문구 자동 생성, 6-1 YouTube 관리)
-- **PREPARED**: P1 8개 — PIPE-F05/F10/F01/F02 + 2-1 + 5-12 + 5-17(무색무취) + 5-18(술병이 났다, depends 해제), P2 4개(5-16 보류 포함), P3 2개
-- **FINISHED**: 39개 (PIPE-F03 PoC 보류 결론)
+- **CURRENT**: 3개 (5-18 술병이 났다 — v1/v2 9곡 생성 완료 / 7-1 YouTube 문구 / 6-1 YouTube 관리)
+- **PREPARED**: P1 8개 — PIPE-F05/F10/F11(신규)/F01/F02 + 2-1 + 5-12 + 5-17(무색무취), P2 4개(5-16 보류), P3 2개
+- **FINISHED**: 39개 (PIPE-F03 PoC 보류, 5-14 게시, 4-3 폐기)
 - **DIFFICULTY**: 3개
 - **Plan**: [production_pipeline_v2.md](docs/plans/production_pipeline_v2.md) — Phase 1~3 구현 계획
