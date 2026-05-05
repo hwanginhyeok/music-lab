@@ -30,6 +30,9 @@ CHROME_DEBUG_PORT = int(os.getenv("CHROME_DEBUG_PORT", "9222"))
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "")
 CAPTCHA_TIMEOUT = 300
+POLL_TIMEOUT = int(os.getenv('SUNO_POLL_TIMEOUT', '300'))
+POLL_INTERVAL = 5
+POLL_ITERATIONS = max(1, POLL_TIMEOUT // POLL_INTERVAL)
 
 
 class SunoError(Exception):
@@ -40,6 +43,9 @@ def _send_telegram(text: str) -> bool:
     """텔레그램 알림 전송."""
     if not TELEGRAM_BOT_TOKEN or not ADMIN_CHAT_ID:
         logger.warning("텔레그램 알림 설정 없음 (ADMIN_CHAT_ID 필요)")
+        # 캡차 메시지면 콘솔에도 명확히 표시
+        if "캡차" in text or "captcha" in text.lower():
+            print(f"\n{'='*60}\n[USER ACTION REQUIRED]\n{text}\n{'='*60}\n", flush=True)
         return False
     try:
         resp = requests.post(
@@ -144,52 +150,61 @@ for (var b of buttons) {
 return results;
 """
 
-# 인스트루멘탈 모드 전용 JS — 가사 스킵, Style + Title만 입력
-# Suno UI 변경 가능성 — 셀렉터 실패 시 디버그 스크린샷 필요
+# Advanced 모드 Instrumental 전용 JS — 빈 lyrics + style만 입력
 JS_SET_VALUE_INSTRUMENTAL = """
 function setNativeValue(element, value) {
     var proto = element.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
-    var valueSetter = Object.getOwnPropertyDescriptor(proto.prototype, 'value').set;
-    var protoSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'value');
-    if (protoSetter && protoSetter.set && valueSetter !== protoSetter.set) {
-        protoSetter.set.call(element, value);
-    } else {
-        valueSetter.call(element, value);
-    }
+    var setter = Object.getOwnPropertyDescriptor(proto.prototype, 'value').set;
+    setter.call(element, value);
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-var textareas = document.querySelectorAll('textarea');
 var results = {};
-results.instrumentalMode = true;
 
-// 인스트루멘탈 모드: 가사 textarea 스킵 (비어있거나 disabled 상태여야 함)
-if (textareas[0]) {
-    results.lyricsVisible = textareas[0].offsetParent !== null;
-    results.lyricsDisabled = textareas[0].disabled;
+// Lyrics textarea — 빈 문자열 명시 입력
+var lyricsTa = document.querySelector('textarea[data-testid="lyrics-textarea"]');
+if (lyricsTa) {
+    lyricsTa.focus();
+    setNativeValue(lyricsTa, '');
+    lyricsTa.blur();
+    results.lyrics = 'cleared(' + lyricsTa.value.length + ')';
+} else {
+    results.lyrics = 'lyrics-textarea-not-found';
 }
 
-// textarea[1] = style of music (인스트루멘탈에서도 입력 필요)
-if (textareas[1] && textareas[1].offsetParent !== null) {
-    textareas[1].focus();
-    setNativeValue(textareas[1], arguments[0]);
-    results.style = textareas[1].value.substring(0, 30);
+// Style of Music — Advanced 모드의 두 번째 visible textarea (lyrics 아닌 것)
+var styleTa = null;
+document.querySelectorAll('textarea').forEach(function(t) {
+    if (t.dataset.testid === 'lyrics-textarea') return;
+    if (t.offsetParent === null) return;
+    var s = window.getComputedStyle(t);
+    if (s.visibility === 'hidden' || s.display === 'none') return;
+    if (!styleTa) styleTa = t;
+});
+if (styleTa) {
+    styleTa.focus();
+    setNativeValue(styleTa, arguments[0]);
+    results.style = styleTa.value.substring(0, 30);
+} else {
+    results.style = 'style-textarea-not-found';
 }
 
-// title input
-var titleInput = document.querySelector("input[placeholder='Song Title (Optional)']");
+// Title input
+var titleInput = document.querySelector('input[placeholder="Song Title (Optional)"]');
 if (titleInput) {
     titleInput.focus();
     setNativeValue(titleInput, arguments[1]);
-    results.title = titleInput.value;
+    results.title = titleInput.value.substring(0, 30);
 }
 
-// Create 버튼 상태
-var buttons = document.querySelectorAll('button');
-for (var b of buttons) {
-    if (b.textContent.trim() === 'Create') {
+// Create 버튼 활성화 상태
+var btns = document.querySelectorAll('button');
+for (var b of btns) {
+    if ((b.textContent || '').trim() === 'Create') {
         results.createEnabled = !b.disabled;
+        results.createDisabledAttr = b.getAttribute('disabled');
+        break;
     }
 }
 
@@ -403,115 +418,64 @@ class SunoClient:
             return False
 
     def _toggle_instrumental(self) -> bool:
-        """Instrumental 토글 클릭. 이미 활성화 상태면 스킵.
+        """Instrumental 토글 best-effort 클릭. 보이지 않으면 스킵 (placeholder 동작에 위임)."""
+        from selenium.webdriver.common.by import By
+        driver = self._driver
+        if not driver:
+            return True
+        try:
+            btn = driver.execute_script("""
+            var b = document.querySelector('button[aria-label="Check this to generate an instrumental only song"]');
+            if (!b) return null;
+            var s = window.getComputedStyle(b);
+            var ps = b.parentElement ? window.getComputedStyle(b.parentElement) : null;
+            var visible = s.visibility !== 'hidden' && s.display !== 'none' && (!ps || ps.visibility !== 'hidden');
+            if (visible) { b.click(); return 'clicked'; }
+            return 'hidden';
+            """)
+            logger.info('Instrumental 토글 상태: %s', btn or 'not-found')
+        except Exception as e:
+            logger.warning('Instrumental 토글 처리 예외 (스킵): %s', e)
+        return True
 
-        Suno UI 변경 가능성 — 셀렉터 실패 시 디버그 스크린샷 필요.
+    def _switch_to_simple_instrumental(self) -> bool:
+        """Simple 모드 전환 + Instrumental 탭 활성화. ActionChains 필수.
 
-        Returns:
-            True: 토글 활성화 성공 또는 이미 활성화됨
-            False: 토글 찾기 실패 (기본 모드로 진행)
+        A 시도 — 봇 감지로 4회 실패. 보존만 (롤백용).
         """
         from selenium.webdriver.common.by import By
-        from pathlib import Path
-
+        from selenium.webdriver.common.action_chains import ActionChains
         driver = self._driver
         if not driver:
             return False
-
-        debug_dir = Path("data/debug")
-        debug_dir.mkdir(parents=True, exist_ok=True)
-
         try:
-            # Instrumental 토글 셀렉터 후보들 (안정적인 순서대로 시도)
-            toggle_selectors = [
-                # (1) 버튼 텍스트로 찾기 (가장 안정적)
-                "//button[contains(text(), 'Instrumental')]",
-                # (2) aria-label로 찾기
-                "//button[@aria-label='Instrumental' or @aria-label='instrumental']",
-                # (3) 라벨+체크박스 구조
-                "//label[contains(., 'Instrumental')]//input[@type='checkbox']",
-                # (4) 버튼 내부 텍스트 (공백/대소문자 무시)
-                "//button[contains(translate(., 'INSTRUMENTAL', 'instrumental'), 'instrumental')]",
-                # (5) data-testid 속성 (Suno가 사용한다면)
-                "//button[@data-testid='instrumental-toggle']",
-                "//input[@data-testid='instrumental-checkbox']",
-            ]
-
-            toggle = None
-            for xpath in toggle_selectors:
-                try:
-                    elements = driver.find_elements(By.XPATH, xpath)
-                    for el in elements:
-                        if el.is_displayed():
-                            toggle = el
-                            logger.info("Instrumental 토글 발견 (셀렉터: %s)", xpath)
-                            break
-                    if toggle:
-                        break
-                except Exception:
-                    continue
-
-            if not toggle:
-                ts = int(time.time())
-                driver.save_screenshot(
-                    str(debug_dir / f"instrumental_toggle_not_found_{ts}.png")
-                )
-                logger.warning(
-                    "Instrumental 토글 못 찾음 — 일반 모드로 진행 (screenshot 저장)"
-                )
-                return False
-
-            # 이미 활성화 상태 확인 (aria-checked, class, checked 속성)
-            is_active = False
-            aria_checked = toggle.get_attribute("aria-checked")
-            if aria_checked is not None:
-                is_active = aria_checked.lower() == "true"
+            # 1) Simple 버튼 (이미 active면 스킵)
+            simple_btn = driver.find_element(By.XPATH, "//button[.//span[normalize-space()='Simple']]")
+            if 'active' not in (simple_btn.get_attribute('class') or ''):
+                ActionChains(driver).move_to_element(simple_btn).pause(0.3).click().perform()
+                time.sleep(2)
+                logger.info('Simple 모드 전환')
             else:
-                # checkbox/radio type
-                checked = toggle.get_attribute("checked")
-                if checked is not None:
-                    is_active = checked.lower() == "true"
+                logger.info('이미 Simple 모드')
 
-            # 클래스 기반 확인 (Suno가 'active' 또는 'selected' 클래스 사용할 수 있음)
-            class_attr = toggle.get_attribute("class") or ""
-            if any(c in class_attr.lower() for c in ["active", "selected", "checked"]):
-                is_active = True
-
-            if is_active:
-                logger.info("Instrumental 토글 이미 활성화됨 — 클릭 스킵")
-                return True
-
-            # 토글 클릭
-            toggle.click()
-            time.sleep(1)
-            logger.info("Instrumental 토글 클릭 완료")
-
-            # 클릭 후 활성화 확인
-            aria_checked_after = toggle.get_attribute("aria-checked")
-            if aria_checked_after is not None:
-                is_active_after = aria_checked_after.lower() == "true"
-            else:
-                class_after = toggle.get_attribute("class") or ""
-                is_active_after = any(
-                    c in class_after.lower() for c in ["active", "selected", "checked"]
-                )
-
-            if is_active_after:
-                logger.info("Instrumental 토글 활성화 확인됨")
-                return True
-            else:
-                logger.warning("Instrumental 토글 클릭했으나 활성화 안 됨 — 일반 모드로 진행")
-                return False
-
+            # 2) Instrumental 탭 클릭
+            inst_btn = driver.find_element(
+                By.XPATH,
+                '//button[@aria-label="Check this to generate an instrumental only song"]'
+            )
+            ActionChains(driver).move_to_element(inst_btn).pause(0.3).click().perform()
+            time.sleep(1.5)
+            logger.info('Instrumental 탭 클릭')
+            return True
         except Exception as e:
             ts = int(time.time())
+            from pathlib import Path
+            Path('data/debug').mkdir(parents=True, exist_ok=True)
             try:
-                driver.save_screenshot(
-                    str(debug_dir / f"instrumental_toggle_exc_{ts}.png")
-                )
+                driver.save_screenshot(f'data/debug/simple_instrumental_fail_{ts}.png')
             except Exception:
                 pass
-            logger.warning("Instrumental 토글 조작 중 예외 — 일반 모드로 진행: %s", e)
+            logger.error('Simple+Instrumental 시퀀스 실패: %s', e)
             return False
 
     def generate(
@@ -560,63 +524,81 @@ class SunoClient:
         except Exception:
             pass
 
-        # Advanced 모드 활성화
-        try:
-            adv = wait.until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, "//button[contains(., 'Advanced')]")
-                )
-            )
-            adv.click()
-            time.sleep(2)
-            logger.info("Advanced 모드 활성화")
-        except Exception:
-            logger.info("이미 Advanced 모드")
-
-        # 모델 선택 (UI 기본값 v5.5 — Pro 플랜). v5.5면 스킵, 다른 버전만 드롭다운 조작.
-        # 드롭다운이 열린 채 남으면 Create 버튼을 덮어서 생성 요청 가로챔 — ESC로 강제 닫기 보장.
-        if model and model != "v5.5":
-            self._select_model(model)
-        try:
-            from selenium.webdriver.common.keys import Keys
-            driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-            time.sleep(0.5)
-        except Exception:
-            pass
-
-        # 인스트루멘탈 모드: 토글 클릭 (가사 입력 전에 실행해야 함)
+        # 인스트루멘탈 모드 처리
         if instrumental:
-            logger.info("Instrumental 모드 활성화 시도...")
-            toggle_success = self._toggle_instrumental()
-            if not toggle_success:
-                logger.warning("Instrumental 토글 실패 — 일반 모드로 진행")
-            time.sleep(1)
+            # (A) Simple 모드 시도는 봇 감지로 4회 실패. 보존만.
+            # if not self._switch_to_simple_instrumental():
+            #     raise SunoError("Simple+Instrumental 전환 실패")
 
-        # JS로 가사 + 스타일 + 제목 입력 (인스트루멘털 모드면 가사 스킵)
+            # (C) Advanced 모드 + 빈 lyrics input event 경로
+            logger.info('인스트루멘탈 모드 — Advanced + 빈 lyrics input event')
+            # Advanced 모드 활성화 (이미 기본값일 가능성)
+            try:
+                adv = wait.until(EC.element_to_be_clickable(
+                    (By.XPATH, "//button[contains(., 'Advanced')]")
+                ))
+                if 'active' not in (adv.get_attribute('class') or ''):
+                    adv.click()
+                    time.sleep(2)
+                    logger.info('Advanced 모드 활성화')
+                else:
+                    logger.info('이미 Advanced 모드')
+            except Exception:
+                logger.info('Advanced 모드 토글 처리 스킵 (이미 진입했거나 셀렉터 변경)')
+            # 모델 선택 (v5.5 기본)
+            if model and model != 'v5.5':
+                self._select_model(model)
+            try:
+                from selenium.webdriver.common.keys import Keys
+                driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ESCAPE)
+                time.sleep(0.5)
+            except Exception:
+                pass
+        else:
+            # 기존 Advanced 경로 (가사 있는 경우) 그대로 유지
+            try:
+                adv = wait.until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, "//button[contains(., 'Advanced')]")
+                    )
+                )
+                adv.click()
+                time.sleep(2)
+                logger.info("Advanced 모드 활성화")
+            except Exception:
+                logger.info("이미 Advanced 모드")
+
+            # 모델 선택 (UI 기본값 v5.5 — Pro 플랜). v5.5면 스킵, 다른 버전만 드롭다운 조작.
+            # 드롭다운이 열린 채 남으면 Create 버튼을 덮어서 생성 요청 가로챔 — ESC로 강제 닫기 보장.
+            if model and model != "v5.5":
+                self._select_model(model)
+            try:
+                from selenium.webdriver.common.keys import Keys
+                driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                time.sleep(0.5)
+            except Exception:
+                pass
+
+        # JS로 가사 + 스타일 + 제목 입력
         try:
             if instrumental:
-                result = driver.execute_script(JS_SET_VALUE_INSTRUMENTAL, style, title or "")
-                logger.info("인스트루멘털 모드 입력 완료: %s", result)
+                # 빈 lyrics, style만 입력
+                result = driver.execute_script(JS_SET_VALUE_INSTRUMENTAL, style, title or '')
             else:
                 result = driver.execute_script(JS_SET_VALUE, lyrics, style, title or "")
-                logger.info("입력 완료: %s", result)
-
-            if not result.get("createEnabled"):
-                raise SunoError("Create 버튼 비활성화 — 입력이 반영되지 않음")
-
-            # 인스트루멘털 모드 시 로그 확인: 가사 textarea 상태
-            if instrumental and result.get("instrumentalMode"):
-                lyrics_visible = result.get("lyricsVisible", True)
-                lyrics_disabled = result.get("lyricsDisabled", False)
-                logger.info(
-                    "인스트루멘털 모드 확인: 가사 textarea 보임=%s, disabled=%s",
-                    lyrics_visible, lyrics_disabled
-                )
-
+            print(f'[입력 결과] {result}', flush=True)  # logger 안 보이는 환경 고려
+            logger.info('입력 결과: %s', result)
+            if not result.get('createEnabled'):
+                # debug 스크린샷
+                ts = int(time.time())
+                from pathlib import Path
+                Path('data/debug').mkdir(parents=True, exist_ok=True)
+                driver.save_screenshot(f'data/debug/create_disabled_{ts}.png')
+                raise SunoError(f'Create 비활성 — 입력 미반영: {result}')
         except SunoError:
             raise
         except Exception as e:
-            raise SunoError(f"입력 실패: {e}") from e
+            raise SunoError(f'입력 실패: {e}') from e
 
         time.sleep(1)
 
@@ -653,17 +635,50 @@ class SunoClient:
             except Exception as e2:
                 raise SunoError(f"Create 클릭 실패: {e2}") from e2
 
+        # 진단: Create 클릭 직후 5초간 변화 캡처
+        ts0 = int(time.time())
+        for k in range(5):
+            time.sleep(1)
+            try:
+                driver.save_screenshot(f'data/debug/poc6_after_create_{ts0}_{k}.png')
+                print(f'[Create+{k+1}s] url={driver.current_url} title={driver.title!r}', flush=True)
+            except Exception:
+                pass
+
         time.sleep(3)
         if not self._wait_captcha():
             raise SunoError("Create 후 캡차 해결 실패")
 
-        # API 폴링으로 생성 완료 대기 (최대 5분)
+        # API 폴링으로 생성 완료 대기 (기본 5분, SUNO_POLL_TIMEOUT 환경변수로 조정 가능)
         logger.info("곡 생성 대기 중... (API 폴링)")
         _send_telegram(f"🎵 Suno 곡 생성 시작: {title or '무제'}\n대기 중...")
 
         new_songs = []
-        for i in range(60):
-            time.sleep(5)
+        captcha_handled_in_poll = False
+
+        # 폴링 시작 직전에 크레딧 baseline
+        try:
+            initial_credits = api.get_credits()
+            print(f'[폴링 시작] 크레딧 baseline: {initial_credits}', flush=True)
+        except Exception:
+            initial_credits = None
+
+        for i in range(POLL_ITERATIONS):
+            time.sleep(POLL_INTERVAL)
+            # 12 cycles = 60초마다 크레딧 차감 점검
+            if i > 0 and i % 12 == 0 and initial_credits is not None:
+                try:
+                    cur = api.get_credits()
+                    if cur < initial_credits:
+                        print(f'[폴링 {i*5}s] 크레딧 차감 감지: {initial_credits} → {cur}', flush=True)
+                except Exception:
+                    pass
+            # 30초마다 캡차 재검사 (Create 후 지연 발생 가능)
+            if i > 0 and i % 6 == 0 and not captcha_handled_in_poll:
+                if self._detect_captcha():
+                    logger.info("폴링 중 캡차 감지 — 해결 대기")
+                    if self._wait_captcha():
+                        captcha_handled_in_poll = True
             try:
                 api.refresh_jwt()  # JWT 갱신 강제
                 current = api.get_songs(page=0)
@@ -694,14 +709,14 @@ class SunoClient:
                         "생성 중... (%d초, status=%s)",
                         i * 5, pending[0].get("status"),
                     )
-                elif i % 6 == 0:
+                elif i % 12 == 0:
                     logger.info("대기 중... (%d초)", i * 5)
             except Exception as e:
                 logger.warning("API 폴링 실패: %s", e)
 
         if not new_songs:
-            _send_telegram("❌ Suno 곡 생성 타임아웃 (5분)")
-            raise SunoError("곡 생성 타임아웃 (5분)")
+            _send_telegram(f"❌ Suno 곡 생성 타임아웃 ({POLL_TIMEOUT}초)")
+            raise SunoError(f"곡 생성 타임아웃 ({POLL_TIMEOUT}초)")
 
         return [f"https://suno.com/song/{s['id']}" for s in new_songs]
 
