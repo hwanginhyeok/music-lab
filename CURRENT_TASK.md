@@ -2,7 +2,6 @@
 
 | # | 태스크 | 시작일 | blocked | 비고 |
 |---|--------|--------|---------|------|
-| PIPE-F03 | Suno asyncio 병렬 생성 PoC | 2026-05-05 | — | R-1: 단일 JWT 동시 2/3/4요청 rate limit 검증. PoC 후 탭/프로필 전략 결정. 다음 앨범(무색무취의빈병 9곡) 가속화 도구 |
 | 7-1 | YouTube 게시 문구 자동 생성 파이프라인 | 2026-04-23 | — | P1. 곡 메타 → Claude API → 제목/설명/해시태그/타임스탬프. Phase 1 CLI → Phase 2 텔레그램 /youtube_copy → Phase 3 uploader 자동 주입 |
 | 6-1 | YouTube 관리 파이프라인 구축 | 2026-04-09 | — | /youtube_list(목록), /youtube_delete(삭제), 통계 기능 구현. 5-14 게시 완료 — 채널 콘텐츠 누적 시작, 관리 도구 우선순위 평가 필요 |
 

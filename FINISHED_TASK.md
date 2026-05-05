@@ -6,6 +6,7 @@
 |---|--------|--------|------|
 | 5-14 | '그리움만 쌓이게' 재즈 트리오 EP 9곡 | 05-04 | Bill Evans 톤. 9트랙 v1/v2 생성 → 선별 → 마스터 → 영상 → YouTube 게시 완료. Track 06 한국어 여성 보컬(Norah Jones × 나윤선) |
 | 4-3 | ~~"너를 다시" Suno 생성 + YouTube 게시~~ | 05-05 | **취소·폐기**. 컨셉/가사/프롬프트 산출물은 `songs/archive/02_너를_다시/`로 이동. dhruv "double take" 레퍼런스, bedroom pop. 재개 의사 없음 |
+| PIPE-F03 | Suno asyncio 병렬 생성 PoC | 05-05 | **PoC 보류 결론**. asyncio 1.5x/멀티탭 1.2x/멀티프로필 Nx — 모두 ROI·리스크 대비 부적합. 월 1-2 EP에 YAGNI. 프롬프트 최적화+재시도가 우월. 보고서 `docs/poc/pipe_f03_report.md`. 월 3 EP+ 시점에 멀티프로필 재검토 |
 
 ## 2026-04
 
