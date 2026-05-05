@@ -24,19 +24,15 @@ except ImportError:
     print("  pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib")
     sys.exit(1)
 
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+from description_utils import compose_description, AI_DISCLOSURE  # noqa: E402
+
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 YOUTUBE_CATEGORY_MUSIC = "10"
 
-ALBUM_PATH = PROJECT_ROOT / "songs/01_봄이라고_부를게/suite/release/album_video.mp4"
-THUMBNAIL_PATH = PROJECT_ROOT / "songs/01_봄이라고_부를게/suite/video/thumbnail.jpg"
-
-AI_DISCLOSURE = (
-    "\n\n---\n"
-    "이 곡은 AI 도구(Suno, Claude)를 활용하여 제작되었습니다.\n"
-    "작사, 작곡 컨셉 설계는 사람이, 음원 생성은 AI가 담당했습니다.\n"
-    "This song was created with AI tools (Suno, Claude).\n"
-    "Human: concept, lyrics, direction | AI: music generation."
-)
+ALBUM_DIR = PROJECT_ROOT / "songs/01_봄이라고_부를게"
+ALBUM_PATH = ALBUM_DIR / "suite/release/album_video.mp4"
+THUMBNAIL_PATH = ALBUM_DIR / "suite/video/thumbnail.jpg"
 
 
 def get_credentials():
@@ -69,27 +65,10 @@ def get_credentials():
 
 
 def get_video_metadata():
-    """앨범 메타데이터 생성."""
+    """앨범 메타데이터 생성. description은 description_utils로 통일."""
     return {
         "title": "봄이라고 부를게 (Album Suite) - AI 인디 팝",
-        "description": f"""봄이라고 부를게 전체 앨범 (9트랙 Suite)
-
-AI 도구(Suno, Claude)로 만든 인디 팝 앨범입니다.
-감성적인 보컬과 몽환적인 악기 연주가 특징입니다.{AI_DISCLOSURE}
-
-Tracklist:
-1. 봄이라고 부를게 (Main Theme)
-2. 잔향 (Reverberation)
-3. 새벽 녘 (Dawn)
-4. 꽃잎 (Petal)
-5. 바람이 분다 (Wind Blows)
-6. 기억 (Memory)
-7. 빛나는 날 (Shining Day)
-8. 별이 빛나는 밤 (Starry Night)
-9. 봄의 춤 (Spring Dance)
-
-앨범 큐레이션 & 컨셉: 인간 (Claude AI 협업)
-음원 생성: Suno AI""",
+        "description": compose_description(ALBUM_DIR),
         "tags": "인디팝,Indie Pop,팝송,K-POP,감성,보컬,앨범,Suno AI,AI음악,Korean Pop",
         "category_id": YOUTUBE_CATEGORY_MUSIC,
         "privacy_status": "public",  # 바로 공개

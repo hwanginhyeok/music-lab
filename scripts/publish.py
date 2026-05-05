@@ -70,33 +70,26 @@ def update_manifest_status(song_dir: Path, status: str, extra: dict | None = Non
 
 
 def extract_info_from_concept(song_dir: Path) -> dict:
-    """concept.md에서 제목/설명/태그 추출."""
+    """concept.md에서 제목/태그 추출 + description은 description_utils로 합성."""
+    sys.path.insert(0, str(Path(__file__).parent))
+    from description_utils import compose_description, load_description
+
     concept_path = song_dir / "concept.md"
     info = {"title": "", "description": "", "tags": []}
 
-    if not concept_path.is_file():
-        return info
+    if concept_path.is_file():
+        text = concept_path.read_text(encoding="utf-8")
+        match = re.search(r"^#\s+(.+?)(?:\s*[-—]|$)", text, re.MULTILINE)
+        if match:
+            info["title"] = match.group(1).strip()
+        match = re.search(r"장르[:\s]*(.+)", text)
+        if match:
+            genre = match.group(1).strip().strip("*")
+            info["tags"].append(genre)
 
-    text = concept_path.read_text(encoding="utf-8")
-
-    # 제목 추출 (첫 번째 # 줄)
-    match = re.search(r"^#\s+(.+?)(?:\s*[-—]|$)", text, re.MULTILINE)
-    if match:
-        info["title"] = match.group(1).strip()
-
-    # 장르 추출
-    match = re.search(r"장르[:\s]*(.+)", text)
-    if match:
-        genre = match.group(1).strip().strip("*")
-        info["tags"].append(genre)
-
-    # 핵심 컨셉 추출 (설명용)
-    match = re.search(r"##\s*핵심\s*컨셉\s*\n(.*?)(?=\n##|\Z)", text, re.DOTALL)
-    if match:
-        desc = match.group(1).strip()
-        if len(desc) > 500:
-            desc = desc[:500] + "..."
-        info["description"] = desc
+    # description: description.md > concept.md '## 핵심 컨셉' 폴백, 500자 컷 X
+    info["description"] = load_description(song_dir)
+    info["description_full"] = compose_description(song_dir)
 
     return info
 
@@ -469,13 +462,9 @@ def _direct_youtube_upload(
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
         tag_list.extend(["AI Music", "Suno", "AI Generated"])
 
+        from description_utils import AI_DISCLOSURE
         display_title = f"{title} | AI Music by Suno"
-        description = (
-            f"Made with Suno AI\n\n"
-            "---\n"
-            "이 곡은 AI 도구(Suno, Claude)를 활용하여 제작되었습니다.\n"
-            "작사, 작곡 컨셉 설계는 사람이, 음원 생성은 AI가 담당했습니다."
-        )
+        description = "Made with Suno AI\n\n---\n" + AI_DISCLOSURE
 
         video_id = upload_video(
             video_path=video_path,

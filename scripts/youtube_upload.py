@@ -42,20 +42,14 @@ except ImportError:
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
+sys.path.insert(0, str(Path(__file__).parent))
+from description_utils import AI_DISCLOSURE, compose_description, load_description
+
 # OAuth2 범위
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
 # YouTube 카테고리: 10 = Music
 YOUTUBE_CATEGORY_MUSIC = "10"
-
-# AI 콘텐츠 공개 문구
-AI_DISCLOSURE = (
-    "\n\n---\n"
-    "이 곡은 AI 도구(Suno, Claude)를 활용하여 제작되었습니다.\n"
-    "작사, 작곡 컨셉 설계는 사람이, 음원 생성은 AI가 담당했습니다.\n"
-    "This song was created with AI tools (Suno, Claude).\n"
-    "Human: concept, lyrics, direction | AI: music generation."
-)
 
 
 def get_credentials() -> Credentials | None:
@@ -137,28 +131,8 @@ def load_metadata_from_manifest(song_dir: Path) -> dict:
 
 
 def extract_description_from_concept(song_dir: Path) -> str:
-    """concept.md에서 곡 설명 추출."""
-    concept_path = song_dir / "concept.md"
-    if not concept_path.is_file():
-        return ""
-
-    text = concept_path.read_text(encoding="utf-8")
-
-    # 핵심 컨셉 섹션 추출
-    match = re.search(r"##\s*핵심\s*컨셉\s*\n(.*?)(?=\n##|\Z)", text, re.DOTALL)
-    if match:
-        desc = match.group(1).strip()
-        # 너무 길면 자르기
-        if len(desc) > 500:
-            desc = desc[:500] + "..."
-        return desc
-
-    # 첫 번째 ## 이후 내용
-    match = re.search(r"##.*?\n(.*?)(?=\n##|\Z)", text, re.DOTALL)
-    if match:
-        return match.group(1).strip()[:500]
-
-    return ""
+    """[deprecated] description_utils.load_description으로 위임. 500자 컷 제거됨."""
+    return load_description(song_dir)
 
 
 def upload_video(
@@ -188,8 +162,12 @@ def upload_video(
 
     youtube = build("youtube", "v3", credentials=creds)
 
-    # AI 콘텐츠 공개 문구 추가
-    full_description = description + AI_DISCLOSURE
+    # description은 호출자가 description_utils.compose_description으로 완성된 본문을 넘기는 게 표준.
+    # AI_DISCLOSURE가 포함되지 않은 경우(레거시 호출자)에 한해 자동 부착해서 누락 방지.
+    if AI_DISCLOSURE.split("\n")[0] not in description:
+        full_description = description.rstrip() + "\n\n---\n" + AI_DISCLOSURE
+    else:
+        full_description = description
 
     privacy = "public" if public else "unlisted"
 
@@ -310,7 +288,8 @@ def main():
     meta = load_metadata_from_manifest(song_dir)
 
     title = args.title or meta["title"] or song_dir.name
-    description = args.description or extract_description_from_concept(song_dir) or f"{title} - AI 음악 프로젝트"
+    # description: --description 우선, 아니면 description_utils가 본문+챕터+AI_DISCLOSURE까지 합성
+    description = args.description or compose_description(song_dir) or f"{title} - AI 음악 프로젝트"
 
     if args.tags:
         tags = [t.strip() for t in args.tags.split(",")]
