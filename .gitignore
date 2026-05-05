@@ -10,9 +10,10 @@ data/
 .pytest_cache/
 logs/
 
-# YouTube OAuth
+# YouTube OAuth + Drive 서비스 계정
 client_secrets.json
 token.json
+credentials/
 
 # 영상 출력
 *.mp4

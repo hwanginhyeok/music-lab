@@ -33,12 +33,31 @@
 - 마이킹: 색스 가까이, 룸톤 살림
 - 페달링 길게 (잔향 = 빈 잔의 부피)
 
-## Suno 프롬프트
+## Suno 프롬프트 (v1 — Suno Style 칸용 압축본)
 
-⬜ **미작성** — suno-prompt-engineer 에이전트 호출 필요
+### Style of Music (Suno 입력)
 
-### 공통 베이스 (전 트랙 공유)
+```
+late-night smoky jazz, tenor saxophone ballad, 1950s East Coast jazz, BPM 60, D minor, instrumental, sparse, intimate room mic, Coleman Hawkins style, sax + piano + double bass trio, no drums, no electronic, acoustic, restrained vibrato
+```
 
+### Lyrics (Suno 입력)
+
+```
+[Instrumental]
+```
+
+### 모드
+
+`--instrumental` 플래그 사용 (가사 칸 비움, Suno 인스트루멘털 모드)
+
+### 모델
+
+v5.5 (최신, Suno 기본값)
+
+### 풀 컨텍스트 (참고용 — 실제 Suno 입력은 위 압축본만)
+
+공통 베이스:
 ```
 Late-night smoky jazz, 1950s-60s East Coast tone, saxophone-led,
 acoustic recording, intimate room tone, deep dynamic range,
@@ -46,8 +65,7 @@ no electronic elements, no lo-fi, no indie, no K-pop,
 analog warmth, vintage studio mic
 ```
 
-### 이 트랙 차별 변수
-
+이 트랙 차별:
 ```
 [BPM 60] [Key: D minor] [Slow ballad]
 Tenor saxophone melody — clean tone, soft, restrained vibrato
@@ -58,7 +76,3 @@ Reference: Coleman Hawkins "Body and Soul" intro, Ben Webster "Danny Boy"
 Mood: empty glass, quiet melancholy, sitting alone
 Long silences between phrases, rubato feel
 ```
-
-### 섹션 마커 (작성 후 추가)
-
-⬜ Suno에 들어갈 최종 형식 (Verse/Chorus/Bridge 등 또는 [Instrumental] 마커)
