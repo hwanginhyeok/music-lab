@@ -28,7 +28,7 @@
 ## 요약
 
 - **CURRENT**: 3개 (PIPE-F03 Suno 병렬 PoC, 7-1 YouTube 문구 자동 생성, 6-1 YouTube 관리)
-- **PREPARED**: P1 7개 — PIPE-F05/F10/F01/F02 + 2-1 + 5-12 + 5-17(무색무취), P2 4개(5-16 보류 포함), P3 2개
+- **PREPARED**: P1 8개 — PIPE-F05/F10/F01/F02 + 2-1 + 5-12 + 5-17(무색무취) + 5-18(술병이 났다), P2 4개(5-16 보류 포함), P3 2개
 - **FINISHED**: 38개 (5-14 게시 완료, 4-3 너를 다시 폐기)
 - **DIFFICULTY**: 3개
 - **Plan**: [production_pipeline_v2.md](docs/plans/production_pipeline_v2.md) — Phase 1~3 구현 계획
