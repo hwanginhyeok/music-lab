@@ -226,7 +226,7 @@ def check_health() -> dict:
         if "invalid_grant" in err_str:
             result["error"] = f"refresh_token 만료 또는 취소됨 (재인증 필요): {e}"
             result["error_class"] = "invalid_grant"
-        elif "quota" in err_str or "rate_limit" in err_str:
+        elif "quota" in err_str or "rate_limit" in err_str or "ratelimit" in err_str:
             result["error"] = f"API 할당량 초과 (24시간 후 초기화): {e}"
             result["error_class"] = "quota_exceeded"
         else:

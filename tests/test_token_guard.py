@@ -174,6 +174,23 @@ class TestErrorClassification:
         assert result["ok"] is False
         assert result["error_class"] == "quota_exceeded"
 
+    def test_rate_limit_camel_case_classified(self, isolated_paths):
+        """rateLimitExceeded(camelCase) RefreshError → error_class='quota_exceeded'."""
+        try:
+            from google.oauth2.credentials import Credentials
+            from google.auth.exceptions import RefreshError
+        except ImportError:
+            pytest.skip("google-auth 미설치")
+
+        _write_token(isolated_paths["token"])
+        mock_creds = self._make_creds(RefreshError("rateLimitExceeded: quota exceeded"))
+
+        with patch.object(Credentials, "from_authorized_user_file", return_value=mock_creds):
+            result = token_guard.check_health()
+
+        assert result["ok"] is False
+        assert result["error_class"] == "quota_exceeded"
+
     def test_transport_error_classified(self, isolated_paths):
         """TransportError → error_class='network_error'."""
         try:
