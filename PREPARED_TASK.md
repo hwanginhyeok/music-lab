@@ -17,6 +17,10 @@
 
 | # | 태스크 | 우선순위 | depends | 비고 |
 |---|--------|----------|---------|------|
+| PIPE-F10b | PIPE-F10 잔여 (GLM 5.1 + 4.6 리뷰 통합) | P2 | PIPE-F10 (완료 91046ab + d4b05e4) | (a) `_write_token_secure` TOCTOU 원자적 생성 (P3) (b) BLOCK_HOURS 24 삭제 commit 메시지 보강 (c) `(ConnectionError,TimeoutError,OSError)` 범위 명시 (d) ~~rate_limit camelCase 매칭~~ → **d4b05e4로 픽스 완료** (e) `refresh_error` 알림 needs_reauth 테스트 1개 추가 (f) `_save_state` 0600 일관성 (g) **youtube_upload.py token write 0600 미적용** — refresh 시 0644로 되돌림 (h) **공백 분리 "rate limit" 패턴 누락 가능** — google-auth 실제 형식 실증 필요 (i) **mock 메시지 형식** — google-auth RefreshError 메시지 생성 로직 검증 (j) **rate_limit vs quota 분류 분리** — 운영 관점 OK이나 메시지 혼란 가능. 모두 LOW priority. 검증: `/hih-glm review` (GLM 5.1) + `/hih-dual` (Sonnet+GLM 4.6) 2 사이클로 발견 |
+
+| # | 태스크 | 우선순위 | depends | 비고 |
+|---|--------|----------|---------|------|
 | 5-16 | 'Art / Artist' 재즈 EP — 동음 역설 9곡 | P2 | — | **보류 (2026-05-05)**. Bill Evans 톤 Vol.2. 그리움 대상 'Art'(사람 이름) + 'artist'(화자 자아) 동음 역설. 영어 가사. 컨셉 초안 `songs/16_art_artist/concept_draft.md`. 5-17(무색무취) 후 재평가 |
 | 2-2 | Phase 2: 멜로디 만들기 (1~2주) | P2 | 2-1 완료 | |
 | 2-3 | Phase 3: 곡 구조 설계 (1~2주) | P2 | 2-2 완료 | |
