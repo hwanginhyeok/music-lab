@@ -155,7 +155,17 @@ def upload_video(
 
     Returns:
         업로드된 영상 ID (실패 시 None)
+
+    Raises:
+        TokenExpiredError: 토큰이 만료/무효 상태일 때
     """
+    # PIPE-F10: OAuth 토큰 만료 감지 — 불량이면 텔레그램 알림 + TokenExpiredError 발생
+    try:
+        from token_guard import pre_upload_guard
+        pre_upload_guard()
+    except ImportError:
+        pass  # token_guard 미설치 시 스킵 (기존 업로드 동작 유지)
+
     creds = get_credentials()
     if not creds:
         return None
@@ -310,14 +320,21 @@ def main():
     print(f"  공개: {'공개(public)' if args.public else '미등록(unlisted)'}")
     print("=" * 60)
 
-    video_id = upload_video(
-        video_path=video_path,
-        title=title,
-        description=description,
-        tags=tags,
-        thumbnail_path=thumbnail_path,
-        public=args.public,
-    )
+    try:
+        video_id = upload_video(
+            video_path=video_path,
+            title=title,
+            description=description,
+            tags=tags,
+            thumbnail_path=thumbnail_path,
+            public=args.public,
+        )
+    except Exception as e:
+        if "TokenExpiredError" in type(e).__name__:
+            print(f"\n❌ 토큰 오류로 업로드 차단됨: {e}")
+            print("  텔레그램으로 재인증 안내가 전송되었습니다.")
+            sys.exit(2)
+        raise
 
     if video_id:
         update_manifest(song_dir, video_id)

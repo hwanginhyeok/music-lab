@@ -145,6 +145,20 @@ def upload_album(youtube, metadata):
 def main():
     print("봄이라고 부를게 앨범 YouTube 업로드\n")
 
+    # PIPE-F10: 업로드 전 토큰 상태 검사
+    try:
+        sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+        from token_guard import pre_upload_guard
+        pre_upload_guard()
+    except ImportError:
+        pass
+    except Exception as e:
+        if "TokenExpiredError" in type(e).__name__:
+            print(f"\n❌ 토큰 오류로 업로드 차단됨: {e}")
+            print("  텔레그램으로 재인증 안내가 전송되었습니다.")
+            sys.exit(2)
+        raise
+
     # 인증
     print("YouTube 인증 중...")
     creds = get_credentials()

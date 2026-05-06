@@ -232,6 +232,20 @@ def main():
     parser.add_argument("--skip-upload", action="store_true", help="영상까지만, 업로드 스킵")
     args = parser.parse_args()
 
+    # PIPE-F10: 업로드 전 토큰 상태 검사
+    if not args.skip_upload and not args.list:
+        try:
+            sys.path.insert(0, str(Path(__file__).parent))
+            from token_guard import pre_upload_guard
+            pre_upload_guard()
+        except ImportError:
+            pass
+        except Exception as e:
+            if "TokenExpiredError" in type(e).__name__:
+                print(f"\n❌ 토큰 오류로 업로드 차단됨: {e}")
+                sys.exit(2)
+            raise
+
     creds = get_credentials()
     drive = build("drive", "v3", credentials=creds)
 

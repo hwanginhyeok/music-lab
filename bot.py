@@ -331,7 +331,8 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "📝 /quiz — 음악 이론 퀴즈\n\n"
         "🎬 YouTube 게시\n"
         "/publish — Suno 곡 목록 + YouTube 업로드\n"
-        "/publish [song_id] — 해당 곡 YouTube 게시\n\n"
+        "/publish [song_id] — 해당 곡 YouTube 게시\n"
+        "/oauth_status — OAuth 토큰 만료 상태 확인\n\n"
         "💬 명령어 없이 자유롭게 대화해도 OK\n"
         "💡 대화 맥락을 기억해서 \"아까 그 코드 바꿔줘\" 가능!",
     )
@@ -1819,6 +1820,53 @@ async def _handle_youtube_callback(update: Update, ctx: ContextTypes.DEFAULT_TYP
         await query.edit_message_text(f"❌ 삭제 실패: {e}")
 
 
+async def cmd_oauth_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """OAuth 토큰 상태 확인 + 실시간 refresh 테스트 (PIPE-F10)."""
+    if not await _check_auth(update):
+        return
+
+    await update.message.reply_text("🔍 토큰 상태 확인 중...")
+
+    try:
+        import sys as _sys
+        from pathlib import Path as _Path
+        _sys.path.insert(0, str(_Path(__file__).parent / "scripts"))
+        from token_guard import check_health, _load_state, _parse_dt, _now, WARN_DAYS
+        import json as _json
+
+        result = check_health()
+        state = _load_state()
+        last_ok = _parse_dt(state.get("last_ok_utc"))
+        days_since = (_now() - last_ok).total_seconds() / 86400 if last_ok else None
+
+        if result["ok"]:
+            staleness = ""
+            if days_since and days_since >= WARN_DAYS:
+                staleness = f"\n⚠️ 마지막 검증: {days_since:.0f}일 전 (cron 점검 필요)"
+            msg = (
+                f"✅ YouTube 토큰 정상\n"
+                f"갱신 테스트: 성공\n"
+                + (f"마지막 검증: {last_ok.strftime('%m/%d %H:%M')} UTC" if last_ok else "마지막 검증: 방금")
+                + staleness
+            )
+        else:
+            last_ok_str = last_ok.strftime("%Y-%m-%d") if last_ok else "기록 없음"
+            msg = (
+                f"🚨 YouTube 토큰 이상\n"
+                f"오류: {result['error']}\n"
+                f"마지막 정상: {last_ok_str}\n\n"
+                "재인증 방법:\n"
+                "cd ~/music-lab\n"
+                "python3 scripts/youtube_upload.py songs/14_geuriumi/ --skip-upload"
+            )
+
+        await update.message.reply_text(msg)
+
+    except Exception as e:
+        logger.error("OAuth 상태 확인 오류: %s", e)
+        await update.message.reply_text(f"❌ 상태 확인 실패: {e}")
+
+
 # ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
@@ -1855,6 +1903,7 @@ def main() -> None:
     app.add_handler(CommandHandler("youtube_list", cmd_youtube_list))
     app.add_handler(CommandHandler("youtube_delete", cmd_youtube_delete))
     app.add_handler(CommandHandler("youtube_stats", cmd_youtube_stats))
+    app.add_handler(CommandHandler("oauth_status", cmd_oauth_status))
     app.add_handler(CallbackQueryHandler(_handle_suno_callback, pattern="^suno:"))
     app.add_handler(CallbackQueryHandler(_handle_youtube_callback, pattern="^youtube:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
