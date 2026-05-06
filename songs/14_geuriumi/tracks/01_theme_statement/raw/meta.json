@@ -1,0 +1,26 @@
+{
+  "track": "01_theme_statement",
+  "title": "Theme Statement",
+  "album": "왜 그리 울고만 있어요? 그리움만 쌓이게",
+  "generated_at": "2026-04-30T14:13:49+09:00",
+  "method": "suno_pipeline.py + (C) Advanced 모드 + 빈 lyrics input event",
+  "model": "v5.5",
+  "instrumental": true,
+  "style": "acoustic piano trio, bill evans inspired, modal jazz, brush drums, walking double bass, late night jazz club, intimate trio, warm analog recording, 1961 jazz aesthetic, rootless voicings, melodic bass interplay, restrained swing, 78bpm, D minor",
+  "credits_consumed": 10,
+  "credits_after": 2640,
+  "versions": {
+    "v1": {
+      "song_id": "9cd4a9ea-3d8b-43ad-b23c-78c9d9532d57",
+      "suno_url": "https://suno.com/song/9cd4a9ea-3d8b-43ad-b23c-78c9d9532d57",
+      "size_bytes": 3321318
+    },
+    "v2": {
+      "song_id": "57b5dbe9-0983-4a34-981d-a4f87d756c83",
+      "suno_url": "https://suno.com/song/57b5dbe9-0983-4a34-981d-a4f87d756c83",
+      "size_bytes": 3498630
+    }
+  },
+  "captcha_count": 1,
+  "notes": "PoC #6. (A) Simple 모드 + Instrumental 탭 4회 실패 후 (C) Advanced+빈 lyrics input event 경로로 성공."
+}

@@ -1,0 +1,269 @@
+{
+  "leftPanelButtons": [
+    {
+      "aria": "Collapse sidebar",
+      "h": 32,
+      "outer": "<button type=\"button\" aria-label=\"Collapse sidebar\" class=\"inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[inherit] before:bord",
+      "text": "",
+      "w": 34,
+      "x": 149,
+      "y": 35
+    },
+    {
+      "aria": "Profile menu button",
+      "h": 36,
+      "outer": "<button type=\"button\" tabindex=\"0\" aria-haspopup=\"menu\" id=\"base-ui-_r_38_\" data-testid=\"profile-menu-button\" aria-label=\"Profile menu button\" class=\"group cursor-pointer pt-0 w-full\" aria-expanded=\"f",
+      "text": "moosaekmoochuiPro Plan",
+      "w": 167,
+      "x": 13,
+      "y": 115
+    },
+    {
+      "aria": "Notification settings",
+      "h": 36,
+      "outer": "<button class=\"mx-2 flex items-center justify-center rounded-lg p-2 text-foreground-secondary transition-colors hover:bg-background-primary hover:text-foreground-primary focus:ring-2 focus:ring-primar",
+      "text": "",
+      "w": 36,
+      "x": 156,
+      "y": 11
+    },
+    {
+      "aria": null,
+      "h": 34,
+      "outer": "<button type=\"button\" tabindex=\"0\" data-base-ui-click-trigger=\"\" id=\"base-ui-_r_3c_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events",
+      "text": "Terms & Policies",
+      "w": 167,
+      "x": 16,
+      "y": 791
+    },
+    {
+      "aria": null,
+      "h": 50,
+      "outer": "<button type=\"button\" tabindex=\"0\" data-base-ui-click-trigger=\"\" id=\"base-ui-_r_3f_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events",
+      "text": "More",
+      "w": 167,
+      "x": 16,
+      "y": 829
+    },
+    {
+      "aria": "View Archived",
+      "h": 40,
+      "outer": "<button type=\"button\" aria-label=\"View Archived\" title=\"View Archived\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:r",
+      "text": "Archived",
+      "w": 102,
+      "x": 256,
+      "y": 16
+    },
+    {
+      "aria": null,
+      "h": 40,
+      "outer": "<button type=\"button\" data-button-id=\"_r_2t_\" data-mouseover-id=\"_r_2s_\" data-context-menu-trigger=\"true\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 ",
+      "text": "",
+      "w": 40,
+      "x": 349,
+      "y": 298
+    },
+    {
+      "aria": null,
+      "h": 34,
+      "outer": "<button class=\"css-jhj0x4 e2bc4gy0\" id=\"base-ui-_r_f_\" data-trigger-disabled=\"\"><span class=\"css-1r87ggi e2bc4gy3\">Simple</span></button>",
+      "text": "Simple",
+      "w": 55,
+      "x": 219,
+      "y": 17
+    },
+    {
+      "aria": null,
+      "h": 34,
+      "outer": "<button class=\"active css-jhj0x4 e2bc4gy0\" id=\"base-ui-_r_h_\" data-trigger-disabled=\"\"><div class=\"css-bi2uiu e2bc4gy1\" style=\"opacity: 1;\"><div class=\"css-1tdmbod e2bc4gy2\" style=\"transform: none; op",
+      "text": "Advanced",
+      "w": 73,
+      "x": 274,
+      "y": 17
+    },
+    {
+      "aria": null,
+      "h": 34,
+      "outer": "<button class=\"css-jhj0x4 e2bc4gy0\" id=\"base-ui-_r_2v_\" data-trigger-disabled=\"\"><span class=\"css-1r87ggi e2bc4gy3\">Sounds</span></button>",
+      "text": "Sounds",
+      "w": 59,
+      "x": 347,
+      "y": 17
+    },
+    {
+      "aria": "Add audio - Browse, upload, or record audio",
+      "h": 56,
+      "outer": "<button type=\"button\" aria-label=\"Add audio - Browse, upload, or record audio\" data-button-id=\"_r_n_\" data-mouseover-id=\"_r_m_\" data-context-menu-trigger=\"true\" id=\"base-ui-_r_p_\" class=\"relative inli",
+      "text": "Audio",
+      "w": 134,
+      "x": 216,
+      "y": 84
+    },
+    {
+      "aria": "Add Voice",
+      "h": 56,
+      "outer": "<button type=\"button\" aria-label=\"Add Voice\" id=\"base-ui-_r_r_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-",
+      "text": "VoiceNew",
+      "w": 134,
+      "x": 351,
+      "y": 84
+    },
+    {
+      "aria": "Add inspiration from a playlist",
+      "h": 56,
+      "outer": "<button type=\"button\" aria-label=\"Add inspiration from a playlist\" id=\"base-ui-_r_t_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-event",
+      "text": "Inspo",
+      "w": 134,
+      "x": 485,
+      "y": 84
+    },
+    {
+      "aria": "Undo changes",
+      "h": 40,
+      "outer": "<button disabled=\"\" type=\"button\" aria-label=\"Undo changes\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[inh",
+      "text": "",
+      "w": 40,
+      "x": 419,
+      "y": 172
+    },
+    {
+      "aria": "Save lyrics",
+      "h": 40,
+      "outer": "<button disabled=\"\" type=\"button\" aria-label=\"Save lyrics\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[inhe",
+      "text": "",
+      "w": 40,
+      "x": 467,
+      "y": 172
+    },
+    {
+      "aria": "No saved styles",
+      "h": 40,
+      "outer": "<button disabled=\"\" type=\"button\" aria-label=\"No saved styles\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[",
+      "text": "",
+      "w": 40,
+      "x": 232,
+      "y": 544
+    },
+    {
+      "aria": "Refresh recommended styles",
+      "h": 40,
+      "outer": "<button type=\"button\" aria-label=\"Refresh recommended styles\" id=\"base-ui-_r_2r_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-no",
+      "text": "",
+      "w": 40,
+      "x": 280,
+      "y": 544
+    },
+    {
+      "aria": "Add style: 어쿠스틱 드럼 키트",
+      "h": 32,
+      "outer": "<button type=\"button\" aria-label=\"Add style: 어쿠스틱 드럼 키트\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[inheri",
+      "text": "어쿠스틱 드럼 키트",
+      "w": 125,
+      "x": 328,
+      "y": 548
+    },
+    {
+      "aria": "Add style: 보컬 재즈",
+      "h": 32,
+      "outer": "<button type=\"button\" aria-label=\"Add style: 보컬 재즈\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[inherit] be",
+      "text": "보컬 재즈",
+      "w": 79,
+      "x": 461,
+      "y": 548
+    },
+    {
+      "aria": null,
+      "h": 24,
+      "outer": "<button type=\"button\" data-selected=\"false\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[inherit] before:bor",
+      "text": "Male",
+      "w": 42,
+      "x": 499,
+      "y": 766
+    },
+    {
+      "aria": null,
+      "h": 24,
+      "outer": "<button type=\"button\" data-selected=\"true\" id=\"base-ui-_r_1j_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[",
+      "text": "Manual",
+      "w": 54,
+      "x": 500,
+      "y": 832
+    },
+    {
+      "aria": null,
+      "h": 40,
+      "outer": "<button type=\"button\" tabindex=\"0\" data-base-ui-click-trigger=\"\" id=\"base-ui-_r_1s_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events",
+      "text": "My Workspace",
+      "w": 109,
+      "x": 494,
+      "y": 769
+    },
+    {
+      "aria": "Clear all form inputs",
+      "h": 48,
+      "outer": "<button disabled=\"\" type=\"button\" aria-label=\"Clear all form inputs\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rou",
+      "text": "",
+      "w": 48,
+      "x": 152,
+      "y": 731
+    },
+    {
+      "aria": "Create song",
+      "h": 48,
+      "outer": "<button disabled=\"\" type=\"button\" aria-label=\"Create song\" id=\"base-ui-_r_2h_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none ",
+      "text": "Create",
+      "w": 418,
+      "x": 216,
+      "y": 731
+    }
+  ],
+  "lyricsHeader": [
+    {
+      "aria": "Expand lyrics box",
+      "depth": 1,
+      "outer": "<button type=\"button\" aria-label=\"Expand lyrics box\" id=\"base-ui-_r_1b_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before",
+      "text": ""
+    }
+  ],
+  "lyricsLabels": [
+    {
+      "buttonCount": 0,
+      "buttonsNearby": [],
+      "containerClass": "css-1a6mtca ewqyxzs3",
+      "inputsNearby": [],
+      "text": "Lyrics"
+    }
+  ],
+  "modeIndicator": {
+    "customText": null,
+    "customVisible": false,
+    "simpleText": "Simple",
+    "simpleVisible": true
+  },
+  "moreOpts": [
+    {
+      "aria": null,
+      "outer": "<div class=\"css-1xt3ue1 e3dlop40\"><div tabindex=\"0\" role=\"button\" aria-expanded=\"false\" class=\"css-1f7qn6n e3dlop41\"><span class=\"css-143mww3 e3dlop43\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1",
+      "tag": "DIV",
+      "text": "More Options"
+    },
+    {
+      "aria": null,
+      "outer": "<div tabindex=\"0\" role=\"button\" aria-expanded=\"false\" class=\"css-1f7qn6n e3dlop41\"><span class=\"css-143mww3 e3dlop43\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 2",
+      "tag": "DIV",
+      "text": "More Options"
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"css-6jsm4u ewqyxzs2\"><div class=\"css-1a6mtca ewqyxzs3\">More Options</div><div class=\"css-1jt5leb ewqyxzs4\"></div></div>",
+      "tag": "DIV",
+      "text": "More Options"
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"css-1a6mtca ewqyxzs3\">More Options</div>",
+      "tag": "DIV",
+      "text": "More Options"
+    }
+  ]
+}

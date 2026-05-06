@@ -1,0 +1,26 @@
+{
+  "track": "04_saxophone",
+  "title": "Saxophone (Her Answer)",
+  "album": "왜 그리 울고만 있어요? 그리움만 쌓이게",
+  "generated_at": "2026-04-30T05:53:28.946Z",
+  "method": "suno_pipeline.py + (C) Advanced 모드 + 빈 lyrics input event",
+  "model": "v5.5",
+  "instrumental": true,
+  "style": "acoustic piano trio, tenor saxophone lead, bill evans inspired, modal jazz, brush drums, walking double bass, late night jazz club, intimate trio, warm analog recording, 1961 jazz aesthetic, rootless voicings, stan getz tone, breathy warm saxophone, sweet rain era, piano comping behind saxophone, 76bpm, C minor",
+  "versions": {
+    "v1": {
+      "song_id": "12ac14a8-0b8c-4be9-ba8a-35b7dff543a1",
+      "suno_url": "https://suno.com/song/12ac14a8-0b8c-4be9-ba8a-35b7dff543a1",
+      "size_bytes": 3688758,
+      "created_at": "2026-04-30T05:53:28.946Z"
+    },
+    "v2": {
+      "song_id": "72af83a9-145d-470c-9cce-ef6d914b3d90",
+      "suno_url": "https://suno.com/song/72af83a9-145d-470c-9cce-ef6d914b3d90",
+      "size_bytes": 4023702,
+      "created_at": "2026-04-30T05:53:28.946Z"
+    }
+  },
+  "recovered_from_workspace": true,
+  "notes": "generate_album.py 검증 버그로 자동 다운로드 실패. workspace에서 회수."
+}

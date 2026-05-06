@@ -1,0 +1,210 @@
+{
+  "modes": {
+    "modes": [
+      {
+        "ariaDisabled": null,
+        "ariaPressed": null,
+        "className": "css-jhj0x4 e2bc4gy0",
+        "dataState": null,
+        "disabled": false,
+        "found": true,
+        "hasButton": true,
+        "name": "Simple",
+        "outer": "<button class=\"css-jhj0x4 e2bc4gy0\" id=\"base-ui-_r_f_\" data-trigger-disabled=\"\"><span class=\"css-1r87ggi e2bc4gy3\">Simple</span></button>",
+        "triggerDisabled": ""
+      },
+      {
+        "ariaDisabled": null,
+        "ariaPressed": null,
+        "className": "active css-jhj0x4 e2bc4gy0",
+        "dataState": null,
+        "disabled": false,
+        "found": true,
+        "hasButton": true,
+        "name": "Advanced",
+        "outer": "<button class=\"active css-jhj0x4 e2bc4gy0\" id=\"base-ui-_r_h_\" data-trigger-disabled=\"\"><div class=\"css-bi2uiu e2bc4gy1\" style=\"opacity: 1;\"><div class=\"css-1tdmbod e2bc4gy2\" style=\"transform: none; opacity: 1;\"></div></div><span class=\"css-1r87ggi e2bc4gy3\">Advanced</span></butto",
+        "triggerDisabled": ""
+      },
+      {
+        "ariaDisabled": null,
+        "ariaPressed": null,
+        "className": "css-jhj0x4 e2bc4gy0",
+        "dataState": null,
+        "disabled": false,
+        "found": true,
+        "hasButton": true,
+        "name": "Sounds",
+        "outer": "<button class=\"css-jhj0x4 e2bc4gy0\" id=\"base-ui-_r_2v_\" data-trigger-disabled=\"\"><span class=\"css-1r87ggi e2bc4gy3\">Sounds</span></button>",
+        "triggerDisabled": ""
+      }
+    ],
+    "parentGroup": {
+      "className": "flex flex-1 items-center justify-stretch gap-0",
+      "outer": "<span class=\"flex flex-1 items-center justify-stretch gap-0\"><button class=\"css-jhj0x4 e2bc4gy0\" id=\"base-ui-_r_f_\" data-trigger-disabled=\"\"><span class=\"css-1r87ggi e2bc4gy3\">Simple</span></button><button class=\"active css-jhj0x4 e2bc4gy0\" id=\"base-ui-_r_h_\" data-trigger-disabled=\"\"><div class=\"css-bi2uiu e2bc4gy1\" style=\"opacity: 1;\"><div class=\"css-1tdmbod e2bc4gy2\" style=\"transform: none; opacity: 1;\"></div></div><span class=\"css-1r87ggi e2bc4gy3\">Advanced</span></button><button class=\"css-jhj0x4 e2bc4gy0\" id=\"base-ui-_r_2v_\" data-trigger-disabled=\"\"><span class=\"css-1r87ggi e2bc4gy3\">Soun",
+      "role": null,
+      "tag": "SPAN"
+    }
+  },
+  "modelCandidates": [
+    {
+      "aria": null,
+      "outer": "<div class=\"css-1bw1xc4 e18u0c160\"><div class=\"css-l9hfgy e18u0c162\" style=\"justify-content: flex-start;\"><div class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-",
+      "tag": "DIV",
+      "text": "SimpleAdvancedSoundsv5.5",
+      "x": 200,
+      "y": 0
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"css-14smtc8 e18u0c163\"><div class=\"css-p7vlvj e18u0c168\"><div class=\"css-1eh7usl e18u0c164\"><div class=\"relative\"><button type=\"button\" data-button-id=\"_r_j_\" data-mouseover-id=\"_r_i_\" data-context-menu-trigg",
+      "tag": "DIV",
+      "text": "v5.5",
+      "x": 560,
+      "y": 14
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"relative flex flex-row items-center justify-center gap-2\">v5.5<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\" fill=\"currentColor\" class=\"-ml-1 h-4 w-4\"><g><path d=\"M16.65",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 576,
+      "y": 25
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"flex min-w-0 items-center gap-2\"><div class=\"flex items-center gap-2 min-w-0\"><div class=\"css-1r3k5k6 e1px8tq016\"><div class=\"clip-title-wrapper css-1sdvpv4 e1px8tq013\"><a class=\"hover:underline\" href=\"/song/",
+      "tag": "DIV",
+      "text": "That Day's Warmth, and Usv5.5",
+      "x": 774,
+      "y": 138
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"css-123m9pi e1px8tq010\">v5.5</span>",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 948,
+      "y": 141
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"flex min-w-0 items-center gap-2\"><div class=\"flex items-center gap-2 min-w-0\"><div class=\"css-1r3k5k6 e1px8tq016\"><div class=\"clip-title-wrapper css-1sdvpv4 e1px8tq013\"><a class=\"hover:underline\" href=\"/song/",
+      "tag": "DIV",
+      "text": "That Day's Warmth, and Usv5.5",
+      "x": 774,
+      "y": 249
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"css-123m9pi e1px8tq010\">v5.5</span>",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 948,
+      "y": 252
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"flex min-w-0 items-center gap-2\"><div class=\"flex items-center gap-2 min-w-0\"><div class=\"css-1r3k5k6 e1px8tq016\"><div class=\"clip-title-wrapper css-1sdvpv4 e1px8tq013\"><a class=\"hover:underline\" href=\"/song/",
+      "tag": "DIV",
+      "text": "그 날의 온도, 그리고 우리v5.5",
+      "x": 774,
+      "y": 360
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"css-123m9pi e1px8tq010\">v5.5</span>",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 929,
+      "y": 363
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"flex min-w-0 items-center gap-2\"><div class=\"flex items-center gap-2 min-w-0\"><div class=\"css-1r3k5k6 e1px8tq016\"><div class=\"clip-title-wrapper css-1sdvpv4 e1px8tq013\"><a class=\"hover:underline\" href=\"/song/",
+      "tag": "DIV",
+      "text": "그 날의 온도, 그리고 우리v5.5",
+      "x": 774,
+      "y": 471
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"css-123m9pi e1px8tq010\">v5.5</span>",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 929,
+      "y": 474
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"flex min-w-0 items-center gap-2\"><div class=\"flex items-center gap-2 min-w-0\"><div class=\"css-1r3k5k6 e1px8tq016\"><div class=\"clip-title-wrapper css-1sdvpv4 e1px8tq013\"><a class=\"hover:underline\" href=\"/song/",
+      "tag": "DIV",
+      "text": "v55 testv5.5",
+      "x": 774,
+      "y": 582
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"css-123m9pi e1px8tq010\">v5.5</span>",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 835,
+      "y": 585
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"flex min-w-0 items-center gap-2\"><div class=\"flex items-center gap-2 min-w-0\"><div class=\"css-1r3k5k6 e1px8tq016\"><div class=\"clip-title-wrapper css-1sdvpv4 e1px8tq013\"><a class=\"hover:underline\" href=\"/song/",
+      "tag": "DIV",
+      "text": "v55 testv5.5",
+      "x": 774,
+      "y": 693
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"css-123m9pi e1px8tq010\">v5.5</span>",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 835,
+      "y": 696
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"flex min-w-0 items-center gap-2\"><div class=\"flex items-center gap-2 min-w-0\"><div class=\"css-1r3k5k6 e1px8tq016\"><div class=\"clip-title-wrapper css-1sdvpv4 e1px8tq013\"><a class=\"hover:underline\" href=\"/song/",
+      "tag": "DIV",
+      "text": "Wishing You The Best (C)v5.5",
+      "x": 774,
+      "y": 804
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"css-123m9pi e1px8tq010\">v5.5</span>",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 937,
+      "y": 807
+    },
+    {
+      "aria": null,
+      "outer": "<div class=\"flex min-w-0 items-center gap-2\"><div class=\"flex items-center gap-2 min-w-0\"><div class=\"css-1r3k5k6 e1px8tq016\"><div class=\"clip-title-wrapper css-1sdvpv4 e1px8tq013\"><a class=\"hover:underline\" href=\"/song/",
+      "tag": "DIV",
+      "text": "Wishing You The Best (C)v5.5",
+      "x": 774,
+      "y": 915
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"css-123m9pi e1px8tq010\">v5.5</span>",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 937,
+      "y": 918
+    },
+    {
+      "aria": null,
+      "outer": "<span class=\"css-123m9pi e1px8tq010\">v5.5</span>",
+      "tag": "SPAN",
+      "text": "v5.5",
+      "x": 960,
+      "y": 1029
+    }
+  ]
+}

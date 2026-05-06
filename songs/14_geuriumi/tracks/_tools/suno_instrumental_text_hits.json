@@ -1,0 +1,43 @@
+[
+  {
+    "text": "Instrumental",
+    "trail": [
+      {
+        "aria": null,
+        "cls": "relative flex flex-row items-center justify-center gap-2",
+        "outer": "<span class=\"relative flex flex-row items-center justify-center gap-2\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\" fill=\"currentColor\" class=\"h-5 w-5 text-background-tertiary\"><g><path d=\"m10.741 16.145 5.71-5.71a.885.885 0 0 0 0-1.258.885",
+        "role": null,
+        "tag": "SPAN",
+        "testid": null,
+        "text": "Instrumental"
+      },
+      {
+        "aria": "Check this to generate an instrumental only song",
+        "cls": "relative inline-block font-sans font-medium text-center before:absolute before:i",
+        "outer": "<button type=\"button\" aria-label=\"Check this to generate an instrumental only song\" id=\"base-ui-_r_26_\" class=\"relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[inherit] before:border before:bg-transp",
+        "role": null,
+        "tag": "BUTTON",
+        "testid": null,
+        "text": "Instrumental"
+      },
+      {
+        "aria": null,
+        "cls": "css-1nh29ol e14knbrc2",
+        "outer": "<div class=\"css-1nh29ol e14knbrc2\"><div class=\"flex grow flex-row gap-2\"><div class=\"relative\"><button type=\"button\" aria-label=\"Browse, upload, or record audio\" data-button-id=\"_r_20_\" data-mouseover-id=\"_r_1v_\" data-context-menu-trigger=\"true\" id=\"base-ui-_r_22_\" class=\"relativ",
+        "role": null,
+        "tag": "DIV",
+        "testid": null,
+        "text": "AudioLyricsInstrumental"
+      },
+      {
+        "aria": null,
+        "cls": "css-fm20ov e14knbrc0",
+        "outer": "<div class=\"css-fm20ov e14knbrc0\"><div class=\"css-1bnrrh4 e14knbrc1\"><div class=\"mb-0 h-full pb-0 css-16gnezu e10u9h7c0\"><textarea placeholder=\"해돋이 무렵 시장에 대한 차분한 멈블 랩 노래\" class=\"w-full resize-none border-none bg-transparent text-base outline-none md:text-sm\" maxlength=\"3000\" styl",
+        "role": null,
+        "tag": "DIV",
+        "testid": null,
+        "text": "0/3000AudioLyricsInstrumentalInspiration부식남부 컨트리 록프로그 드림 팝금관"
+      }
+    ]
+  }
+]

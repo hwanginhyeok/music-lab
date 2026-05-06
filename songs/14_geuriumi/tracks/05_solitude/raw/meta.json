@@ -1,0 +1,26 @@
+{
+  "track": "05_solitude",
+  "title": "Solitude",
+  "album": "왜 그리 울고만 있어요? 그리움만 쌓이게",
+  "generated_at": "2026-04-30T05:41:49.901Z",
+  "method": "suno_pipeline.py + (C) Advanced 모드 + 빈 lyrics input event",
+  "model": "v5.5",
+  "instrumental": true,
+  "style": "acoustic piano trio, bill evans inspired, modal jazz, brush drums, walking double bass, late night jazz club, intimate trio, warm analog recording, 1961 jazz aesthetic, rootless voicings, melodic bass interplay, restrained swing, piano solo feature, sparse bass, minimal drums, 70bpm, E minor",
+  "versions": {
+    "v1": {
+      "song_id": "bae21c75-ba79-4fd7-947f-f42f7f715406",
+      "suno_url": "https://suno.com/song/bae21c75-ba79-4fd7-947f-f42f7f715406",
+      "size_bytes": 3616758,
+      "created_at": "2026-04-30T05:41:49.901Z"
+    },
+    "v2": {
+      "song_id": "81092643-0e36-4773-9664-ff31680e9cef",
+      "suno_url": "https://suno.com/song/81092643-0e36-4773-9664-ff31680e9cef",
+      "size_bytes": 3615174,
+      "created_at": "2026-04-30T05:41:49.901Z"
+    }
+  },
+  "recovered_from_workspace": true,
+  "notes": "generate_album.py 검증 버그로 자동 다운로드 실패. workspace에서 회수."
+}

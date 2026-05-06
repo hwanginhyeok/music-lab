@@ -1,0 +1,24 @@
+{
+  "track": "09_reprise",
+  "title": "Reprise (Theme Returns)",
+  "album": "왜 그리 울고만 있어요? 그리움만 쌓이게",
+  "generated_at": "2026-04-30T05:52:19.667622+00:00",
+  "method": "suno_pipeline.py + (C) Advanced 모드 + 빈 lyrics input event",
+  "model": "v5.5",
+  "instrumental": true,
+  "style": "acoustic piano trio, bill evans inspired, modal jazz, brush drums, walking double bass, late night jazz club, intimate trio, warm analog recording, 1961 jazz aesthetic, rootless voicings, melodic bass interplay, restrained swing, circular, return, 78bpm, D minor",
+  "credits_consumed": 20,
+  "credits_after": 2570,
+  "versions": {
+    "v1": {
+      "song_id": "4619f38c-6153-4d60-bdfc-57292c39b414",
+      "suno_url": "https://suno.com/song/4619f38c-6153-4d60-bdfc-57292c39b414",
+      "size_bytes": 3081558
+    },
+    "v2": {
+      "song_id": "96a6c450-84fb-4be6-9f3a-f10cac6e74bf",
+      "suno_url": "https://suno.com/song/96a6c450-84fb-4be6-9f3a-f10cac6e74bf",
+      "size_bytes": 3129990
+    }
+  }
+}
