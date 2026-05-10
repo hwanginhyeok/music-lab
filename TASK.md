@@ -27,8 +27,8 @@
 
 ## 요약
 
-- **CURRENT**: 3개 (5-18 술병이 났다 — v1/v2 9곡 생성 완료 / 7-1 YouTube 문구 / 6-1 YouTube 관리)
-- **PREPARED**: P1 8개 — PIPE-F05/F10/F11(신규)/F01/F02 + 2-1 + 5-12 + 5-17(무색무취), P2 4개(5-16 보류), P3 2개
-- **FINISHED**: 39개 (PIPE-F03 PoC 보류, 5-14 게시, 4-3 폐기)
+- **CURRENT**: 4개 (6-1, 7-1, 5-19 Daylight Hours, 5-20 Electric Feelings)
+- **PREPARED**: P1 9개 — PIPE-F05/F10/F11/F01/F02 + 2-1 + 5-12 + 5-17(무색무취) + 5-21(시간여행자), P2 5개, P3 2개
+- **FINISHED**: 40개 (5-18 술병이 났다 YouTube 게시 완료)
 - **DIFFICULTY**: 3개
 - **Plan**: [production_pipeline_v2.md](docs/plans/production_pipeline_v2.md) — Phase 1~3 구현 계획
