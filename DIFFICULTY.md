@@ -82,3 +82,23 @@
 - **관련 파일**: `suno_pipeline.py` (폴링 부분), `scripts/batch_5-18_remaining.sh` (워크어라운드)
 - **관련 커밋**: `4e79d4d`, `6f67ee6`
 
+
+## D-004: Suno 배치 동시실행 충돌 + Chrome DISPLAY 문제
+
+- **날짜**: 2026-05-10
+- **상황**: 5-21 시간여행자 20트랙 배치 생성 시도
+- **문제**: 3가지 문제가 동시 발생
+  1. **Chrome 시작 실패** — VNC DISPLAY가 꺼진 상태에서 배치 실행 → 전 트랙 실패
+  2. **가짜 mp3 이동** — 배치 스크립트가 Chrome 실패 후에도 `data/suno/`의 기존 다른 mp3를 트랙 폴더로 이동 (LATEST_MP3 체크 로직이 실패 후에도 이전 파일 잡아냄)
+  3. **동시실행 충돌** — 재시도 스크립트 3개가 동시에 실행되면서 같은 Chrome 9222포트에 동시 접속 → 가사/스타일 뒤섞여 생성
+- **삽질**: VNC_DISPLAY=:99 설정, DISPLAY 환경변수 조정, pkill 반복, 로그 뒤지기
+- **해결**:
+  1. VNC 먼저 켠 후 (`nohup websockify ...`) Chrome 시작 확인 (`curl http://127.0.0.1:9222/json`)
+  2. 배치 실행 전 `pkill -9 -f suno_pipeline` 으로 잔여 프로세스 완전 정리
+  3. **반드시 배치 1개만 실행** — 재시도도 기존 배치 kill 후 단일 실행
+  4. 가짜 mp3 판별: 크기 < 1M이면 의심 (정상은 2.4M~6M)
+- **노하우**:
+  - Suno 배치 전 체크리스트: ① VNC 켜짐 확인 ② Chrome 9222 응답 확인 ③ 기존 suno_pipeline 프로세스 0개 확인
+  - `ps aux | grep suno_pipeline | grep -v grep | wc -l` → 0이어야 시작
+  - 배치 스크립트에 `pgrep -f suno_pipeline && echo "이미 실행 중" && exit 1` 가드 추가 권장
+- **관련 파일**: `scripts/batch_시간여행자.sh`, `suno_client.py`, `suno_pipeline.py`
