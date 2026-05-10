@@ -29,7 +29,10 @@
 - `songs/21_시간여행자/tracks/` — 20개 트랙 폴더 (로컬, GDrive 이전 전)
 
 ## 다음 세션 첫 액션
-1. `tail -20 /tmp/suno_시간여행자.log` — 배치 완료 여부 확인
+1. Suno Chrome 시작 실패 — 전 트랙 mp3 0개 생성, 크레딧 차감 없음(2010 유지)
+   → chrome 프로세스 정리 후 재시도: `pkill -f chrome; pkill -f chromedriver`
+   → 또는 suno_pipeline.py --headless 옵션 확인
+   → 개별 트랙 테스트: `python3 suno_pipeline.py --title "Slow Reverse" --prompt-file songs/21_시간여행자/tracks/01_slow_reverse/suno_prompt.md --skip-drive --model v5.5`
 2. 완료됐으면: 생성된 mp3 청취 → best take 선별 → 후처리
 3. 미완료면: 실패 트랙 재실행
 4. 5-19/5-20 선별 완료됐으면 후처리(-14 LUFS) 시작
