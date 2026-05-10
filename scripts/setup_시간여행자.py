@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-시간여행자 앨범 — 배치 생성 준비 스크립트
+시간여행자 앨범 v2 — 배치 생성 준비 스크립트
 
 시간여행자_suno.md 파싱 → 트랙별 suno_prompt.md 생성 + 배치 스크립트 생성
+20트랙 새 제목 적용 (2026-05-10)
 """
 import re
 import stat
@@ -13,26 +14,26 @@ ALBUM_DIR = Path("songs/21_시간여행자")
 BATCH_SCRIPT = Path("scripts/batch_시간여행자.sh")
 
 TRACK_SLUGS = {
-    1:  "01_slow_reverse",
-    2:  "02_waterline",
-    3:  "03_dont_rewind",
-    4:  "04_alley_summer",
-    5:  "05_vhs_of_you",
-    6:  "06_across_the_skyline",
-    7:  "07_whats_your_motive",
-    8:  "08_drive_lights",
-    9:  "09_tictoc_zaun",
-    10: "10_hate_you_for_forever",
-    11: "11_getting_over_jinx",
-    12: "12_somebody_broke_the_clock",
-    13: "13_hallelujah_powder",
-    14: "14_hate_me_love_me_anyway",
-    15: "15_burn_the_timeline",
-    16: "16_no_interruption_tonight",
-    17: "17_everything_she_lost",
-    18: "18_ups_and_downs_z",
-    19: "19_up_and_find_you",
-    20: "20_bite_marks_on_time",
+    1:  "01_pressed_and_ready",
+    2:  "02_a_little_at_a_time",
+    3:  "03_already_know_the_end",
+    4:  "04_swear_on_the_z_drive",
+    5:  "05_there_you_are",
+    6:  "06_tape_from_the_alley",
+    7:  "07_come_with_me",
+    8:  "08_bottom_to_the_top",
+    9:  "09_underdog_entrance",
+    10: "10_carolina_rush",
+    11: "11_no_interruption_z",
+    12: "12_ups_downs_z",
+    13: "13_wrong_timeline_goodbye",
+    14: "14_coolest_kid_in_zaun",
+    15: "15_get_out_of_my_way",
+    16: "16_look_what_you_make_me_do",
+    17: "17_running",
+    18: "18_still_here_with_you",
+    19: "19_look_twice",
+    20: "20_tease_me_time",
 }
 
 content = SRC.read_text(encoding="utf-8")
