@@ -46,8 +46,8 @@ def _safe_filename(title: str) -> str:
 class SunoAPI:
     """Clerk JWT 인증 기반 Suno API 클라이언트."""
 
-    BASE_URL = "https://studio-api-prod.suno.com"
-    CLERK_URL = "https://clerk.suno.com"
+    BASE_URL = "https://studio-api.prod.suno.com"
+    CLERK_URL = "https://auth.suno.com"
 
     def __init__(self):
         self.cookie = os.getenv("SUNO_COOKIE", "")
@@ -103,7 +103,7 @@ class SunoAPI:
     def get_songs(self, page: int = 0) -> list[dict]:
         """내 곡 목록."""
         self._get_jwt()
-        r = self._session.post(f"{self.BASE_URL}/api/feed/v3", json={"page": page})
+        r = self._session.get(f"{self.BASE_URL}/api/feed/?page={page}")
         if r.status_code != 200:
             print(f"❌ 곡 목록 조회 실패: {r.status_code}")
             return []

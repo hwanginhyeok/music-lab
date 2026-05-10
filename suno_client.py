@@ -244,7 +244,7 @@ class SunoClient:
         return self._driver
 
     def _detect_captcha(self) -> bool:
-        """실제 차단 캡차 감지 (페이지 임베드 스크립트는 무시)."""
+        """실제 차단 캡차 감지 (iframe + Suno 이미지 선택 팝업 포함)."""
         driver = self._driver
         if not driver:
             return False
@@ -273,14 +273,48 @@ class SunoClient:
                 if el.is_displayed() and el.size.get("height", 0) > 50:
                     return True
 
+            # Suno 이미지 선택 캡차 팝업 감지 (건너뛰기/검사 버튼 있는 팝업)
+            for btn in driver.find_elements(By.TAG_NAME, "button"):
+                try:
+                    txt = btn.text.strip()
+                    if txt in ("건너뛰기", "검사", "Skip", "Verify") and btn.is_displayed():
+                        return True
+                except Exception:
+                    continue
+
             return False
         except Exception:
             return False
 
+    def _try_skip_captcha(self) -> bool:
+        """Suno 이미지 캡차 '건너뛰기' 버튼 자동 클릭 시도."""
+        driver = self._driver
+        if not driver:
+            return False
+        try:
+            from selenium.webdriver.common.by import By
+            for btn in driver.find_elements(By.TAG_NAME, "button"):
+                txt = btn.text.strip()
+                if txt in ("건너뛰기", "Skip") and btn.is_displayed():
+                    btn.click()
+                    logger.info("캡차 '건너뛰기' 클릭")
+                    time.sleep(2)
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _wait_captcha(self) -> bool:
-        """캡차 감지 시 알림 후 해결 대기."""
+        """캡차 감지 시 건너뛰기 시도 → 실패 시 알림 후 해결 대기."""
         if not self._detect_captcha():
             return True
+
+        # 먼저 건너뛰기 버튼 자동 클릭 시도
+        if self._try_skip_captcha():
+            time.sleep(2)
+            if not self._detect_captcha():
+                logger.info("캡차 건너뛰기 성공 — 자동 재개")
+                return True
 
         logger.warning("캡차 감지! 사용자 개입 필요")
         _send_telegram(
@@ -292,6 +326,8 @@ class SunoClient:
         start = time.time()
         while time.time() - start < CAPTCHA_TIMEOUT:
             time.sleep(3)
+            # 매 루프마다 건너뛰기 재시도
+            self._try_skip_captcha()
             if not self._detect_captcha():
                 logger.info("캡차 해결됨 — 자동 재개")
                 _send_telegram("✅ 캡차 해결! 자동화 재개합니다.")
@@ -579,17 +615,80 @@ class SunoClient:
             except Exception:
                 pass
 
-        # JS로 가사 + 스타일 + 제목 입력
+        # send_keys 방식으로 입력 (React v5.5 호환)
         try:
-            if instrumental:
-                # 빈 lyrics, style만 입력
-                result = driver.execute_script(JS_SET_VALUE_INSTRUMENTAL, style, title or '')
-            else:
-                result = driver.execute_script(JS_SET_VALUE, lyrics, style, title or "")
-            print(f'[입력 결과] {result}', flush=True)  # logger 안 보이는 환경 고려
+            from selenium.webdriver.common.action_chains import ActionChains
+            from selenium.webdriver.common.keys import Keys as SeleniumKeys
+
+            result = {'lyrics': '', 'style': '', 'title': '', 'createEnabled': False}
+
+            all_tas = driver.find_elements(By.TAG_NAME, 'textarea')
+            visible_tas = [t for t in all_tas if t.is_displayed()]
+
+            # lyrics textarea: placeholder에 'lyrics' 포함하거나 첫 번째
+            lyrics_ta = None
+            style_ta = None
+            for t in visible_tas:
+                ph = (t.get_attribute('placeholder') or '').lower()
+                if 'lyric' in ph or 'write some' in ph:
+                    lyrics_ta = t
+                else:
+                    style_ta = t
+
+            def _js_click_and_type(element, text):
+                """JS click → ActionChains type (element not interactable 우회)."""
+                driver.execute_script(
+                    "arguments[0].scrollIntoView({block:'center'});"
+                    "arguments[0].focus();"
+                    "arguments[0].click();",
+                    element
+                )
+                time.sleep(0.5)
+                ActionChains(driver).move_to_element(element).click().perform()
+                time.sleep(0.3)
+                ActionChains(driver).key_down(SeleniumKeys.CONTROL).send_keys('a').key_up(SeleniumKeys.CONTROL).perform()
+                time.sleep(0.1)
+                # 긴 텍스트는 청크로 나눠 입력
+                chunk = 500
+                for i in range(0, len(text), chunk):
+                    ActionChains(driver).send_keys(text[i:i+chunk]).perform()
+                    time.sleep(0.1)
+
+            # lyrics 입력
+            if lyrics_ta and not instrumental:
+                _js_click_and_type(lyrics_ta, lyrics)
+                val = lyrics_ta.get_attribute('value') or ''
+                result['lyrics'] = val[:30] if val else lyrics[:30]
+
+            # style 입력
+            if not style_ta:
+                style_ta = next((t for t in visible_tas if t != lyrics_ta), None)
+            if style_ta:
+                _js_click_and_type(style_ta, style)
+                val = style_ta.get_attribute('value') or ''
+                result['style'] = val[:30] if val else style[:30]
+
+            # title 입력
+            title_input = None
+            for inp in driver.find_elements(By.TAG_NAME, 'input'):
+                ph = (inp.get_attribute('placeholder') or '').lower()
+                if 'title' in ph or 'song' in ph:
+                    title_input = inp
+                    break
+            if title_input and title:
+                _js_click_and_type(title_input, title or '')
+                result['title'] = title or ''
+
+            # Create 버튼 활성화 확인
+            time.sleep(1)
+            for b in driver.find_elements(By.TAG_NAME, 'button'):
+                if b.text.strip() == 'Create':
+                    result['createEnabled'] = not b.get_attribute('disabled')
+                    break
+
+            print(f'[입력 결과] {result}', flush=True)
             logger.info('입력 결과: %s', result)
             if not result.get('createEnabled'):
-                # debug 스크린샷
                 ts = int(time.time())
                 from pathlib import Path
                 Path('data/debug').mkdir(parents=True, exist_ok=True)
