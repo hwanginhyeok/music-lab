@@ -1,38 +1,33 @@
-# Handoff — 2026-05-10
+# Handoff — 2026-05-10 (세션 2)
 
-> 다음 세션 시작 시 이 파일 읽고 컨텍스트 복구. 복구 끝나면 삭제.
+> 다음 세션 시작 시 읽고 복구. 복구 끝나면 삭제.
 
 ## 작업 중이던 것
 
-### 5-21 시간여행자 — Suno 배치 생성 실행 중
-- **배치 PID**: 55942
-- **로그**: `/tmp/suno_시간여행자.log`
-- 상태 확인: `tail -f /tmp/suno_시간여행자.log`
-- 완료 여부: `ls songs/21_시간여행자/tracks/*/raw/*.mp3 | wc -l` (목표: 20개)
-- 크레딧: 배치 시작 시 2010 크레딧 확인됨
-- 오류 시: 개별 트랙 `python3 suno_pipeline.py --title "..." --prompt-file "..." --skip-drive --model v5.5`
+### 5-21 시간여행자 — 사용자 Suno에서 트랙 선별 중
+- 20트랙 전부 생성 완료 (20:49:36)
+- 크기 정상: 2.4M~4.4M
+- 트랙 폴더: `songs/21_시간여행자/tracks/01_pressed_and_ready ~ 20_tease_me_time`
+- **사용자가 Suno 앱에서 직접 청취 후 best take 선별 중**
+- 선별 완료 후: GDrive 동기화 → 후처리(-14 LUFS) → YouTube 게시
 
 ### 5-19 Daylight Hours / 5-20 Electric Feelings
-- 사용자가 GDrive에서 best take 선별 중
-- 선별 완료 후: 후처리(-14 LUFS) → YouTube 게시
+- 동시에 선별 중 (GDrive에 mp3 있음)
+- 선별 완료되면 후처리(-14 LUFS) → YouTube 게시
 
-## 결정 사항 (2026-05-10)
-- 5-21 시간여행자: jongpop 플레이리스트 3개 분석 기반 20트랙 앨범
-- 썸네일: thumbnail_v1.jpg(에코+파우더 앉은 컷), thumbnail_v2.jpg(시간역행 소용돌이 컷)
-- 6-1 YouTube 관리 파이프라인: 31일 정체 → P3 격하 검토 필요 (사용자 결정)
-- docs/suno_prompts/ 폴더: Suno 프롬프트 파일 전용 (albums/에서 분리)
+## 결정 사항
+- **5-21 음악 방향 확정**: jongpop 🔴신남/활기 17곡 + 🟠설렘 3곡 베이스
+  - Jackson Laird / Fencetrees / 99 Neighbors / Nabes / Logan Levi / Zafty / Forrest Frank / Confetti / The Orphan The Poet / Hoodie Allen / Pertinence / Little Hurt / Harrison Boe / UPSAHL / The Wrecks / Derik Fein / d4vd / byjaye / Nicky Youre
+- **jongpop 베이스 확정** — 방향 재논의 없이 실행
+- **6-1 YouTube 관리 파이프라인**: 31일 blocked → 사용자 결정 필요 (P3 격하 or 폐기)
 
-## 파일 변경 요약
-- `docs/suno_prompts/시간여행자_suno.md` — 20트랙 풀 프롬프트
-- `docs/albums/시간여행자_이미지/` — AI 이미지 3장 + 썸네일 2장
-- `scripts/setup_시간여행자.py`, `scripts/batch_시간여행자.sh` — 배치 스크립트
-- `songs/21_시간여행자/tracks/` — 20개 트랙 폴더 (로컬, GDrive 이전 전)
+## 중요 노하우 (D-004)
+Suno 배치 전 필수 체크:
+1. VNC 켜짐 확인: `curl -sI http://127.0.0.1:6080/` → 200 OK
+2. Chrome 9222 확인: `curl -s http://127.0.0.1:9222/json | head -3`
+3. 기존 프로세스 0개: `ps aux | grep suno_pipeline | grep -v grep | wc -l` → 0
 
 ## 다음 세션 첫 액션
-1. Suno Chrome 시작 실패 — 전 트랙 mp3 0개 생성, 크레딧 차감 없음(2010 유지)
-   → chrome 프로세스 정리 후 재시도: `pkill -f chrome; pkill -f chromedriver`
-   → 또는 suno_pipeline.py --headless 옵션 확인
-   → 개별 트랙 테스트: `python3 suno_pipeline.py --title "Slow Reverse" --prompt-file songs/21_시간여행자/tracks/01_slow_reverse/suno_prompt.md --skip-drive --model v5.5`
-2. 완료됐으면: 생성된 mp3 청취 → best take 선별 → 후처리
-3. 미완료면: 실패 트랙 재실행
-4. 5-19/5-20 선별 완료됐으면 후처리(-14 LUFS) 시작
+1. 사용자에게 선별 완료 여부 확인
+2. 완료됐으면: 선별된 트랙 목록 받고 후처리(-14 LUFS) `/audio-process` 실행
+3. 5-19/5-20도 선별 완료됐으면 동시에 후처리
