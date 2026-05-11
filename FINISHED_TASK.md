@@ -4,6 +4,7 @@
 
 | # | 태스크 | 완료일 | 비고 |
 |---|--------|--------|------|
+| 5-21 | '시간여행자' 앨범 (에코×징크스) | 05-11 | 20트랙 생성 → 11곡 선별 → 영상 편집(31분 42초) → YouTube unlisted 게시. videoId=8ZTFLgUcLPI. 썸네일: 시간역행 소용돌이 컷 |
 | 5-18 | '술병이 났다' 풀앨범 9곡 (3·3·3 동음 역설) | 05-10 | 9트랙 v1/v2 완료. Late-night smoky jazz, 색스 중심. 9번 영어 가사(Gregory Porter 결) 완성. YouTube 게시 완료 |
 | 5-14 | '그리움만 쌓이게' 재즈 트리오 EP 9곡 | 05-04 | Bill Evans 톤. 9트랙 v1/v2 생성 → 선별 → 마스터 → 영상 → YouTube 게시 완료. Track 06 한국어 여성 보컬(Norah Jones × 나윤선) |
 | 4-3 | ~~"너를 다시" Suno 생성 + YouTube 게시~~ | 05-05 | **취소·폐기**. 컨셉/가사/프롬프트 산출물은 `songs/archive/02_너를_다시/`로 이동. dhruv "double take" 레퍼런스, bedroom pop. 재개 의사 없음 |

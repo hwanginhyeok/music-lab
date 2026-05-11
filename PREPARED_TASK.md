@@ -12,7 +12,6 @@
 | 5-12 | Jazz Suite 후처리 (라우드니스 노멀라이즈) | P1 | 4-1 완료 | 트랙 간 볼륨 편차 보정 (-14 LUFS) — PIPE-F04 경량 경로 재사용 가능 |
 | 5-17 | '무색무취의 빈병' 인스트루멘털 앨범 9곡 | P1 | — | Max Richter 중심(Nils Frahm/Ólafur Arnalds/Hania Rani/Joep Beving). 향수병 자아 컨셉, 가사 없음, 남성 보컬리즈 3곡(2/6/8). 컨셉 v0.3 완성 (`docs/albums/무색무취의빈병.md`) — 9트랙 BPM/키/편성/모티프 매핑 끝. PIPE-F03 병렬 생성으로 가속화 |
 | PIPE-F11 | suno_pipeline 폴링 v2 누락 버그 수정 | P1 | — | Suno는 generate 1회당 v1/v2 두 곡 생성하는데 suno_pipeline.py 폴링이 첫 곡 완료 시점에 종료. v2는 사후 suno_download.py로 보충 중. batch 스크립트에서 회피 패턴 검증됨 — 정식 픽스 필요 |
-| 5-21 | '시간여행자' 앨범 (에코 × 징크스) | P1 | — | 아케인 세계관. 에코 Z-Drive 시간역행 × 징크스 찾기. 컨셉 문서: docs/albums/시간여행자_에코징크스.md. 앨범 자켓/썸네일 제작 포함. 트랙 구성 미확정 |
 
 ## P2
 
