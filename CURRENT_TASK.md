@@ -2,8 +2,8 @@
 
 | # | 태스크 | 시작일 | blocked | 비고 |
 |---|--------|--------|---------|------|
-| 5-19 | Daylight Hours 후처리 + 발매 | 2026-05-10 | — | 종팝 15곡. v1.mp3 완료(GDrive). 다음: best take 선별 → 후처리(-14 LUFS) → YouTube 게시 |
-| 5-20 | Electric Feelings 후처리 + 발매 | 2026-05-10 | — | 팝록 분기 15곡. v1.mp3 완료(GDrive). 다음: best take 선별 → 후처리(-14 LUFS) → YouTube 게시 |
+| 5-19 | Daylight Hours 후처리 + 발매 | 2026-05-10 | ⏸️ 보류 | 종팝 15곡. v1.mp3 완료(GDrive). 다음: best take 선별 → 후처리(-14 LUFS) → YouTube 게시 |
+| 5-20 | Electric Feelings 후처리 + 발매 | 2026-05-10 | ⏸️ 보류 | 팝록 분기 15곡. v1.mp3 완료(GDrive). 다음: best take 선별 → 후처리(-14 LUFS) → YouTube 게시 |
 | 7-1 | YouTube 게시 문구 자동 생성 파이프라인 | 2026-04-23 | — | P1. 곡 메타 → Claude API → 제목/설명/해시태그/타임스탬프. Phase 1 CLI → Phase 2 텔레그램 /youtube_copy → Phase 3 uploader 자동 주입 |
 | 6-1 | YouTube 관리 파이프라인 구축 | 2026-04-09 | 채널 콘텐츠 누적 후 평가 (P3급 격하 검토) | /youtube_list(목록), /youtube_delete(삭제), 통계 기능 구현. 5-14 게시 완료. 2개 발매로는 관리 도구 필요성 약함 — 5-18 발매 후 재평가. 27일 정체 |
 
