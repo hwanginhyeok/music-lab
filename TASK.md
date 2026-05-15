@@ -4,9 +4,9 @@
 
 ## 요약
 
-- Current: 6개 (3 blocked)
-- Prepared: 0개 (P0: **0** / P1: **0** / P2: 0 / P3: 0)
-- Finished: 47개
-- 마지막 동기화: 1778825866.1563642
+- Current: 5개 (2 blocked)
+- Prepared: 15개 (P1: 7 / P2: 6 / P3: 2)
+- Finished: 41개
+- 마지막 동기화: 2026-05-15
 
 ---

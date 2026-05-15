@@ -102,3 +102,27 @@
   - `ps aux | grep suno_pipeline | grep -v grep | wc -l` → 0이어야 시작
   - 배치 스크립트에 `pgrep -f suno_pipeline && echo "이미 실행 중" && exit 1` 가드 추가 권장
 - **관련 파일**: `scripts/batch_시간여행자.sh`, `suno_client.py`, `suno_pipeline.py`
+
+## D-007: Suno 인스트루멘털 길이 제어 불가
+
+- **날짜**: 2026-05-15
+- **상황**: 무색무취의 빈병 앨범 Track 2~8 생성 중. 목표 2~4분인데 1:40~2:20으로 짧게 끊김
+- **문제**: Suno v5.5 UI에 duration 슬라이더 없음. `[Instrumental]` 태그만으로는 길이 신호 부족
+- **삽질**:
+  - 섹션 마커(`[Intro][Verse][Bridge][Outro]`) 추가 → 2:20까지만 늘어남
+  - mmm...ah...mmm 패턴 → 사용자가 "허밍 왜 들어가냐" 불만. 허밍 생성됨
+  - Oo-oo-ooh 하이픈 음절 → 비슷한 결과
+  - Style에 `3 minute song, long form` 추가 → 미미한 효과
+  - API (`suno_client.py`) 확인 → duration 파라미터 없음
+  - Exclude 필드 탐색 → UI에서 찾지 못함 (More Options 안에 있다는 정보 있으나 미확인)
+- **결론**:
+  - Suno는 가사 콘텐츠 양 = 곡 길이. 인스트루멘털은 구조적으로 짧음
+  - v5.5 단일 생성 최대 이론치 8분이나 인스트루멘털은 2분대가 현실적 한계
+  - **유일한 검증된 방법: Extend 기능 (UI에서 수동)**
+  - 보컬리즈 음절 입력 시 허밍 생성되고 2분+ 달성 가능 — 컨셉상 허밍이 필요한 트랙(2·6·8번)에만 사용
+- **노하우**:
+  - 인스트루멘털 트랙은 현재 길이 수용하거나 Extend로 이음
+  - 보컬리즈 트랙(2·6·8번): `Oo-oo-ooh Mm-mm` 하이픈 음절 + 6섹션 구조
+  - Style에 `3 minute song` 명시는 효과 미미하나 넣을 것
+  - 순수 인스트루멘털: `[Instrumental]` 섹션 마커 5~6개 + `instrumental only, no vocals`
+- **관련파일**: `songs/17_무색무취의빈병/tracks/*/suno_prompt.md`, `suno_client.py`
