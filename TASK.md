@@ -1,34 +1,12 @@
-# Music Lab 태스크
+# music-lab 태스크
 
-> AI 작사/작곡 + Suno 연동 + YouTube 게시 프로젝트
-
-## 파일 구조
-
-| 파일 | 설명 |
-|------|------|
-| [CURRENT_TASK.md](CURRENT_TASK.md) | 진행 중 태스크 |
-| [PREPARED_TASK.md](PREPARED_TASK.md) | 준비된 태스크 (P1/P2/P3) |
-| [FINISHED_TASK.md](FINISHED_TASK.md) | 완료된 태스크 |
-| [DIFFICULTY.md](DIFFICULTY.md) | 기술 난제 & 노하우 |
-
-## 번호 체계
-
-`{분야}-{순번}` 형식
-
-| 분야 | 코드 | 예시 |
-|------|------|------|
-| 봇/인프라 | 1 | `1-1` 텔레그램 봇 |
-| 학습 | 2 | `2-1` 코드 진행 |
-| 기능 | 3 | `3-1` 대화 히스토리 |
-| 콘텐츠/게시 | 4 | `4-1` YouTube 게시 |
-| 음악 제작 | 5 | `5-1` Suno 프롬프트 |
-| YouTube 관리 | 6 | `6-1` YouTube 관리 파이프라인 |
-| 자동 문구 생성 | 7 | `7-1` YouTube 게시 문구 자동 생성 |
+> Current: [CURRENT_TASK.md](CURRENT_TASK.md) | Prepared: [PREPARED_TASK.md](PREPARED_TASK.md) | Finished: [FINISHED_TASK.md](FINISHED_TASK.md)
 
 ## 요약
 
-- **CURRENT**: 4개 (6-1, 7-1, 5-19 Daylight Hours, 5-20 Electric Feelings)
-- **PREPARED**: P1 9개 — PIPE-F05/F10/F11/F01/F02 + 2-1 + 5-12 + 5-17(무색무취) + 5-21(시간여행자), P2 5개, P3 2개
-- **FINISHED**: 40개 (5-18 술병이 났다 YouTube 게시 완료)
-- **DIFFICULTY**: 3개
-- **Plan**: [production_pipeline_v2.md](docs/plans/production_pipeline_v2.md) — Phase 1~3 구현 계획
+- Current: 6개 (3 blocked)
+- Prepared: 0개 (P0: **0** / P1: **0** / P2: 0 / P3: 0)
+- Finished: 47개
+- 마지막 동기화: 1778825866.1563642
+
+---
