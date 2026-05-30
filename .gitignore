@@ -13,7 +13,12 @@ logs/
 # YouTube OAuth + Drive 서비스 계정
 client_secrets.json
 token.json
+token_backup.json
 credentials/
+
+# 야간작업 임시 프롬프트
+tonight_prompt.txt
+tonight_prompt_done.txt
 
 # 영상 출력
 *.mp4
