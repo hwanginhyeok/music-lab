@@ -214,29 +214,3 @@ journalctl --user -u music-bot -f    # check logs
 ## gstack
 
 Use /browse from gstack for all web browsing.
-
----
-
-## Superpowers 활성화
-
-> 모든 Claude Code 세션 시작 시 `using-superpowers` 스킬을 **반드시 먼저** Skill 도구로 호출할 것.
-
-### 작업 유형별 필수 프로세스
-
-| 작업 유형 | 필수 프로세스 |
-|-----------|--------------|
-| 새 기능 / 기능 수정 | `brainstorming` → `writing-plans` → `matt-tdd` → `verification-before-completion` |
-| 버그 수정 | `systematic-debugging` (재현 → 원인 파악 → 수정 → 검증) → `verification-before-completion` |
-| 계획 수립 | `brainstorming` → `writing-plans` → `executing-plans` |
-
-### 스킬 호출 규칙
-
-1. **Skill 도구 사용**: Read 도구로 직접 읽지 않고 항상 Skill 도구로 호출
-2. **관련 스킬 필수 호출**: 1% 가능성이라도 관련 스킬이 있으면 반드시 호출
-3. **순서 준수**: 프로세스 스킬 먼저 (brainstorming, debugging), 구현 스킬 나중에 (TDD)
-4. **체크리스트 추적**: 체크리스트가 있으면 TodoWrite로 각 항목 추적
-
-### 언어 규칙
-
-- **한국어로 응답** (로그, 코멘트, 메시지 모두 한국어)
-- **코드 변수명/함수명은 영어** 유지

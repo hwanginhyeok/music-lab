@@ -1,12 +1,12 @@
-# music-lab 태스크
+# music-lab Tasks
 
 > Current: [CURRENT_TASK.md](CURRENT_TASK.md) | Prepared: [PREPARED_TASK.md](PREPARED_TASK.md) | Finished: [FINISHED_TASK.md](FINISHED_TASK.md)
 
-## 요약
+## Summary
 
-- Current: 6개 (3 blocked)
-- Prepared: 0개 (P0: **0** / P1: **0** / P2: 0 / P3: 0)
-- Finished: 47개
-- 마지막 동기화: 1778833079.9763086
+- Current: 6 (3 blocked)
+- Prepared: 0 (P0: **0** / P1: **0** / P2: 0 / P3: 0)
+- Finished: 47
+- Last synced: 1778833079.9763086
 
----------------------------------------------------
+---------------------------------------------------------------------------------
