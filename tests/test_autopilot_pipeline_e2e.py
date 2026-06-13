@@ -196,19 +196,37 @@ def mock_prefilter(monkeypatch):
 def fake_runner(tmp_path):
     """subprocess.run 을 대체하는 fake runner.
 
-    postprocess_node 가 기대하는 '{stem}_normalized{suffix}' 파일을 생성한다.
+    postprocess_node 2-패스:
+      - Pass 1 (print_format=json, null sink): stderr 에 loudnorm JSON 반환.
+      - Pass 2 (적용): '{stem}_normalized{suffix}' 파일 생성.
     video_node 가 기대하는 '{stem}.mp4' 파일을 생성한다.
-    둘 다 returncode=0 으로 성공 처리.
+    전부 returncode=0 으로 성공 처리.
     """
     call_count = {"count": 0}
+
+    _loudnorm_json = (
+        "{\n"
+        '	"input_i" : "-14.10",\n'
+        '	"input_tp" : "-1.20",\n'
+        '	"input_lra" : "7.50",\n'
+        '	"input_thresh" : "-24.30",\n'
+        '	"target_offset" : "0.10"\n'
+        "}\n"
+    )
 
     def runner(cmd, **kwargs):
         call_count["count"] += 1
         result = mock.MagicMock()
         result.returncode = 0
-        result.stderr = ""
         result.stdout = ""
 
+        joined = " ".join(str(c) for c in cmd)
+        # Pass 1 (측정): null sink — 파일 생성 안 함, JSON 만 반환.
+        if "print_format=json" in joined:
+            result.stderr = _loudnorm_json
+            return result
+
+        result.stderr = ""
         # cmd 에서 마지막 인자가 출력 파일 경로
         # ffmpeg 는 항상 마지막 positional 인자가 output
         out = Path(cmd[-1])
@@ -445,7 +463,7 @@ class TestAlbumPipelineE2E:
 
         - call_claude: 작사(1) + suno_prompt(1) = 총 2회만 호출됨 (resume 시 skip)
         - Suno generate: 1회만 호출됨 (멱등성 테이블로 run_once 중복 차단)
-        - ffmpeg runner: 후처리 1회 + 영상 1회 = 총 2회만 (resume 2 에서 skip)
+        - ffmpeg runner: 후처리 2-패스(측정+적용 2회) + 영상 1회 = 총 3회만 (resume 2 에서 skip)
         """
         from autopilot.pipeline import run_album, resume_song
 
@@ -486,8 +504,8 @@ class TestAlbumPipelineE2E:
             "resume 1 에서 Suno generate 재호출됨 (멱등성 위반)"
 
         runner_after_resume1 = m["runner"].call_count["count"]
-        assert runner_after_resume1 == 2, \
-            f"ffmpeg runner 호출 횟수={runner_after_resume1}, 기대=2 (후처리+영상)"
+        assert runner_after_resume1 == 3, \
+            f"ffmpeg runner 호출 횟수={runner_after_resume1}, 기대=3 (후처리 2-패스+영상)"
 
         # Resume 2: publish_approval
         resume_song(
@@ -505,7 +523,7 @@ class TestAlbumPipelineE2E:
             "resume 2 에서 Suno generate 재호출됨"
         # ffmpeg runner: resume 2 에서는 후처리+영상이 이미 done → skip
         runner_after_resume2 = m["runner"].call_count["count"]
-        assert runner_after_resume2 == 2, \
+        assert runner_after_resume2 == 3, \
             f"resume 2 에서 ffmpeg 재호출됨: {runner_after_resume2}"
 
     # ── Step 5: 실제 외부 호출 누출 없음 ─────────────────────────────────────
@@ -557,8 +575,8 @@ class TestAlbumPipelineE2E:
 
         # 모든 호출이 mock 으로 처리됐으므로 실제 subprocess.run 은 0회
         # (sentinel_run 을 monkeypatch 하지 않았으므로 이 확인은 deps.runner 검증으로 대체)
-        assert m["runner"].call_count["count"] == 2, \
-            "fake_runner 가 2회 호출됐어야 함 (후처리 + 영상)"
+        assert m["runner"].call_count["count"] == 3, \
+            "fake_runner 가 3회 호출됐어야 함 (후처리 2-패스 + 영상)"
 
         # youtube insert 가 mock 으로만 호출됐는지 (실제 API 아님)
         assert m["youtube"]._insert_count["count"] == 1

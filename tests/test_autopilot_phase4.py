@@ -64,8 +64,8 @@ def _fake_runner_fail(cmd, **kwargs):
 class TestPostprocessNode:
     """후처리 노드: ffmpeg loudnorm mock 검증."""
 
-    def test_loudnorm_명령에_I마이너스14_포함됨(self, ctx, tmp_path, monkeypatch):
-        """loudnorm 필터에 I=-14:TP=-1.5:LRA=11 이 포함되는지 확인."""
+    def test_2패스_loudnorm_명령_검증(self, ctx, tmp_path, monkeypatch):
+        """2-패스: Pass1=측정(print_format=json), Pass2=측정값 기반 적용(linear)."""
         import autopilot.nodes.postprocess as pp_mod
 
         # 임시 오디오 파일 생성 (mock runner이므로 내용 무관)
@@ -74,9 +74,30 @@ class TestPostprocessNode:
 
         captured_cmds: list[list[str]] = []
 
+        # Pass 1 measure JSON (ffmpeg loudnorm 출력 형식 모사).
+        loudnorm_json = (
+            "[Parsed_loudnorm_0 @ 0x55] \n"
+            "{\n"
+            '	"input_i" : "-14.10",\n'
+            '	"input_tp" : "-1.20",\n'
+            '	"input_lra" : "7.50",\n'
+            '	"input_thresh" : "-24.30",\n'
+            '	"output_i" : "-14.00",\n'
+            '	"output_tp" : "-1.50",\n'
+            '	"output_lra" : "7.40",\n'
+            '	"output_thresh" : "-24.20",\n'
+            '	"normalization_type" : "dynamic",\n'
+            '	"target_offset" : "0.10"\n'
+            "}\n"
+        )
+
         def capturing_runner(cmd, **kwargs):
             captured_cmds.append(list(cmd))
-            return _fake_runner_ok(cmd, **kwargs)
+            result = _fake_runner_ok(cmd, **kwargs)
+            # Pass 1 (측정)에는 stderr에 JSON 제공.
+            if "print_format=json" in " ".join(cmd):
+                result.stderr = loudnorm_json
+            return result
 
         # 출력 파일도 생성해 sha256 계산 통과
         normalized = tmp_path / "track_normalized.wav"
@@ -85,17 +106,120 @@ class TestPostprocessNode:
         from autopilot.nodes.postprocess import postprocess_node
         result = postprocess_node(ctx, str(audio), runner=capturing_runner)
 
-        assert len(captured_cmds) == 1
-        cmd = captured_cmds[0]
+        assert len(captured_cmds) == 2
+        p1_cmd, p2_cmd = captured_cmds
 
-        # loudnorm 필터 확인
-        assert "-af" in cmd
-        af_idx = cmd.index("-af")
-        af_val = cmd[af_idx + 1]
-        assert "loudnorm" in af_val
-        assert "I=-14" in af_val
-        assert "TP=-1.5" in af_val
-        assert "LRA=11" in af_val
+        # Pass 1: 측정 명령 (print_format=json, null sink)
+        p1_af = p1_cmd[p1_cmd.index("-af") + 1]
+        assert "loudnorm" in p1_af
+        assert "print_format=json" in p1_af
+        assert "I=-14" in p1_af
+        assert "TP=-1.5" in p1_af
+        assert "LRA=11" in p1_af
+        assert "null" in p1_cmd  # -f null -
+
+        # Pass 2: 측정값 기반 정밀 적용
+        p2_af = p2_cmd[p2_cmd.index("-af") + 1]
+        assert "measured_I=-14.10" in p2_af
+        assert "measured_TP=-1.20" in p2_af
+        assert "measured_LRA=7.50" in p2_af
+        assert "measured_thresh=-24.30" in p2_af
+        assert "offset=0.10" in p2_af
+        assert "linear=true" in p2_af
+        assert "-ar" in p2_cmd  # 출력 샘플레이트
+        # 고비트레이트 출력: 손실 인코딩 라우드니스 시프트 방지 (-14 LUFS 정밀도)
+        assert "-b:a" in p2_cmd
+        assert "320k" in p2_cmd
+
+        # 반환값에 measured_i_pre 포함
+        assert result["measured_i_pre"] == "-14.10"
+
+    def test_2패스_artifact_trace_측정값_포함(self, ctx, tmp_path, monkeypatch):
+        """2-패스 성공 시 artifact/trace에 measured 값이 기록된다."""
+        import autopilot.trace as trace_mod
+
+        audio = tmp_path / "track.wav"
+        audio.write_bytes(b"FAKEAUDIO")
+        normalized = tmp_path / "track_normalized.wav"
+        normalized.write_bytes(b"NORMALIZED")
+
+        loudnorm_json = (
+            "{\n"
+            '	"input_i" : "-14.10",\n'
+            '	"input_tp" : "-1.20",\n'
+            '	"input_lra" : "7.50",\n'
+            '	"input_thresh" : "-24.30",\n'
+            '	"target_offset" : "0.10"\n'
+            "}\n"
+        )
+
+        def runner_2pass(cmd, **kwargs):
+            result = _fake_runner_ok(cmd, **kwargs)
+            if "print_format=json" in " ".join(cmd):
+                result.stderr = loudnorm_json
+            return result
+
+        emitted = []
+        original_emit = trace_mod.emit
+        trace_file = str(tmp_path / "trace.jsonl")
+
+        def capture_emit(event, trace_path=None, **kw):
+            emitted.append(event)
+            original_emit(event, trace_path=trace_file)
+
+        monkeypatch.setattr(trace_mod, "emit", capture_emit)
+
+        from autopilot.nodes.postprocess import postprocess_node
+        postprocess_node(ctx, str(audio), runner=runner_2pass)
+
+        # artifact meta에 측정값
+        arts = ctx.store.conn.execute(
+            "SELECT * FROM artifacts WHERE run_id=? AND kind='audio_mastered'",
+            (ctx.run_id,)
+        ).fetchall()
+        meta = json.loads(arts[0]["meta_json"])
+        assert meta["two_pass"] is True
+        assert meta["measured_i"] == "-14.10"
+        assert meta["measured_thresh"] == "-24.30"
+        assert meta["measured_i_pre"] == "-14.10"
+
+        # trace 이벤트에 measured_i_pre
+        done = [e for e in emitted if e.get("event") == "postprocess_done"]
+        assert done and done[0]["measured_i_pre"] == "-14.10"
+
+    def test_측정_파싱_실패시_1패스_폴백(self, ctx, tmp_path):
+        """Pass1 stderr에 JSON이 없으면 1-패스로 폴백(measured_I 없음), 크래시 없음."""
+        audio = tmp_path / "track.wav"
+        audio.write_bytes(b"FAKEAUDIO")
+        normalized = tmp_path / "track_normalized.wav"
+        normalized.write_bytes(b"NORMALIZED")
+
+        captured_cmds: list[list[str]] = []
+
+        def runner_no_json(cmd, **kwargs):
+            captured_cmds.append(list(cmd))
+            result = _fake_runner_ok(cmd, **kwargs)
+            # JSON 없는 stderr (측정 출력 깨짐 모사)
+            if "print_format=json" in " ".join(cmd):
+                result.stderr = "ffmpeg version 6.0\nNo JSON here at all.\n"
+            return result
+
+        from autopilot.nodes.postprocess import postprocess_node
+        result = postprocess_node(ctx, str(audio), runner=runner_no_json)
+
+        # Pass1(측정) + Pass2(1-패스 폴백) — 단, 폴백 적용 명령은 measured_I 없음
+        # 적용 명령 후보: print_format=json 없는 명령
+        apply_cmds = [c for c in captured_cmds if "print_format=json" not in " ".join(c)]
+        assert len(apply_cmds) == 1
+        apply_cmd = apply_cmds[0]
+        af = apply_cmd[apply_cmd.index("-af") + 1]
+        assert "loudnorm" in af
+        assert "measured_I" not in af  # 1-패스 폴백
+        assert "linear=true" not in af
+
+        # 폴백이므로 measured_i_pre는 None
+        assert result["measured_i_pre"] is None
+        assert result["lufs_target"] == -14
 
     def test_반환_형태(self, ctx, tmp_path):
         """postprocess_node 반환값에 path, sha256, lufs_target 포함."""
