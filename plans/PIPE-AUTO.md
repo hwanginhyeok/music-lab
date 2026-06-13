@@ -2,6 +2,7 @@
 
 > 사용자는 "앨범 기획"만, 나머지(작사→프롬프트→생성→후보추림→[청취선택]→후처리→영상→unlisted 업로드)는 자동.
 > 사람 터치 **3개**: ① 앨범 기획 ② 후보 선택(청취) ③ public 전환.
+> + **이벤트성 터치(예외)**: 생성 중 hCaptcha가 뜰 때만 텔레그램 알림 → 사람이 noVNC로 1회 풀이 → 자동 재개. 상시가 아니라 캡차 발생 시에만.
 
 이 문서는 PM이 Claude + Codex + GLM **3-way 교차검증으로 확정한 설계**의 SSOT다.
 
@@ -12,7 +13,7 @@
 | # | 결정 | 근거 |
 |---|------|------|
 | 1 | 오케스트레이션 = **자체 state machine** | LangGraph 기각(3-way 만장일치). 월 1~2앨범 규모에 과함 + API 파편화 + `interrupt()` 함정. SQLite를 canonical state로. |
-| 2 | 생성 = **서드파티 Suno API** | hCaptcha로 자체 무인생성 불가 확정(DIFFICULTY D-001). Phase 2엔 stub만. 실제 연동은 Phase 1 PoC(API 키 대기 중). |
+| 2 | 생성 = **기존 `suno_client.py` 웹 프로그램** (VNC + 텔레그램 캡차알림 + 자동재개) | ~~서드파티 Suno API~~ **취소(2026-06-13 PM 오판 정정)**. 기존 suno_client.py가 이미 VNC(:1) Chrome 자동화 + 단순캡차 자동skip + hCaptcha는 텔레그램 알림→noVNC 수동풀이→자동재개 + Clerk JWT 다운로드로 반자동 생성을 한다(시간여행자 20곡 실적). **서드파티 API·키·추가비용·외부전송 전부 불필요.** generate 노드는 `suno_client.SunoClient`를 래핑. |
 | 3 | 모니터링 = **LangSmith SDK 독립 연동** | `@traceable`만 사용, LangGraph 없이. 키 없으면 no-op fallback. canonical은 SQLite, trace는 뷰용. |
 | 4 | human-gate = `status='awaiting_*'` + 텔레그램 `/resume` | `interrupt()` 사용 금지. 상태를 DB에 영속화하고 외부에서 answer 주입 → 재개. |
 
@@ -41,7 +42,7 @@ Album(기획)
 |-------|------|------------|------|
 | 0 | 설계 확정 + 문서화(이 문서) | — | ✅ 완료 |
 | **2** | **FSM 코어** (store/engine/idempotency/claude_cli/trace + 노드 stub + pytest) | **0 (키 불필요)** | **← 이번 작업** |
-| 1 | Suno 서드파티 API PoC (generate 실연동) | Suno API 키 | ⏸ PM이 사용자에게 키 요청 중 |
+| 1 | **suno_client.py를 generate 노드로 래핑 + 캡차 발생 빈도 측정** (키/PoC 불필요) | VNC(:1) Chrome | Phase 3에서 래핑, 빈도 측정은 실생성 시 |
 | 3 | 노드 실구현 — 작사/프롬프트/프리필터(F01 역할 재정의) | Phase 1, 2 | 예정 |
 | 4 | 후처리(-14 LUFS)/영상/unlisted 업로드 노드 | Phase 3 | 예정 |
 | 5 | 텔레그램 통합 — 후보카드(F02) + `/resume` 핸들러 | Phase 3, 4 | 예정 |
@@ -110,7 +111,7 @@ Album(기획)
 
 ## 6. 관련 DIFFICULTY
 
-- **D-001**: Suno hCaptcha → 자체 무인생성 불가 → 서드파티 API(결정 2).
+- **D-001**: Suno hCaptcha → 완전 무인생성 불가. **단, suno_client.py가 텔레그램 알림+noVNC 수동풀이+자동재개로 반자동화 완성**(결정 2). 서드파티 API 불필요.
 - **D-003**: Claude CLI npx 최신 자동설치 silent outage → 버전 고정.
 - **D-004**: 가짜 mp3 이동 + 동시 batch 충돌 → idempotency key + run lock.
 - **D-005/D-007**: Suno v1/v2 폴링, 길이 제어 불가 → 노드 구현(Phase 3~4)에서 반영.
