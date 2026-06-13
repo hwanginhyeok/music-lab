@@ -1100,14 +1100,51 @@ def _read_artifact_text(artifacts: list, kind: str) -> str | None:
     return None
 
 
+def _assert_safe_out_dir(p: Path) -> None:
+    """out_dir이 위험한 경로가 아닌지 확인한다.
+
+    위험 경로 조건 (하나라도 해당되면 ValueError):
+      - 루트 파일시스템 (/)
+      - 사용자 홈 디렉토리 (~)
+      - 프로젝트 루트 (/home/window11/music-lab)
+      - 루트 아래 1단계 이내 경로 (parts 수 <= 2, 예: /tmp)
+    """
+    resolved = p.resolve()
+    home = Path.home().resolve()
+    project_root = _PROJECT_ROOT.resolve()
+
+    # 루트 또는 루트 바로 아래 1단계 경로 (parts: ('/',) → len=1, ('/','tmp') → len=2)
+    if len(resolved.parts) <= 2:
+        raise ValueError(
+            f"out_dir이 너무 짧은 경로입니다 (안전하지 않음): {resolved}"
+        )
+
+    dangerous = {
+        Path("/").resolve(),
+        home,
+        project_root,
+    }
+    if resolved in dangerous:
+        raise ValueError(
+            f"out_dir이 위험한 경로입니다 (삭제 거부): {resolved}"
+        )
+
+
 def render(store: Store, trace_path: str, out_dir: str | Path) -> None:
     """SQLite + trace.jsonl을 읽어 HTML 저널을 out_dir에 렌더링한다."""
+    import shutil
+
     try:
         from jinja2 import Template
     except ImportError as e:
         raise RuntimeError("jinja2가 필요합니다: pip install jinja2") from e
 
     out_dir = Path(out_dir)
+
+    # 기존 out_dir을 완전히 지우고 새로 생성 — 재시딩 후 orphan run 디렉토리 방지
+    _assert_safe_out_dir(out_dir)
+    if out_dir.exists():
+        shutil.rmtree(out_dir, ignore_errors=False)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # 모든 run 읽기
