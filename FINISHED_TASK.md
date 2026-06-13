@@ -1,5 +1,18 @@
 # Finished Tasks
 
+## 2026-06
+
+| # | Task | Completed | Notes |
+|---|--------|--------|------|
+| PIPE-F12 | PIPE-AUTO FSM 코어 (Phase 2) | 06-13 | `autopilot/` 자체 state machine. SQLite(runs/steps/human_tasks/artifacts) + `@step`/`@human_gate` 데코 + idempotency + claude_cli 래퍼 + trace 레이어 + state_version 마이그레이션 훅. resume done-skip 멱등. pytest 34. commits `4fcf8b4`/`9bfd2b1`. 설계 SSOT `plans/PIPE-AUTO.md` |
+| PIPE-AUTO Phase 3 | 노드 구현 — 작사/Suno프롬프트/생성/프리필터 | 06-13 | claude_cli 작사·suno-pe 프롬프트(전문 trace)·기존 `suno_client.SunoClient` 래핑 생성·프리필터. 생성결정 정정(서드파티 API 취소→기존 웹프로그램). pytest +18. commits `58c26d2`/`0d5e553` |
+| PIPE-F01 | 프리필터 노드 (역할 재정의) | 06-13 | (구 quality analyzer) pyloudnorm/librosa 지연import, **기술결함만**(클리핑/무음/길이/손상) 필터·취향판단 없음. Phase 3에서 PIPE-AUTO 노드로 편입 |
+| PIPE-F11 | suno v1/v2 폴링 정식구현 | 06-13 | 생성 노드(`autopilot/nodes/generate.py`)가 v1/v2 페어 모두 수확 + idempotency(D-004 중복생성 차단). 폴링 버그 정식 해소 |
+| PIPE-AUTO Phase 4 | 후처리(-14LUFS)/영상/unlisted 업로드 + human-gate | 06-14 | ffmpeg loudnorm·MP4·YouTube Data API v3 unlisted. **publish-gate**(미승인 시 API 호출 0) + idempotency + `/resume` human-gate 재개. pytest +31. commits `8e64a63`/`0d7c420`/`0503603` |
+| PIPE-AUTO 저널 | HTML 프로비넌스 저널 + 샘플 런 | 06-14 | `autopilot/journal.py` 시더+Jinja2 렌더(노드 타임라인·Suno프롬프트 전문·후보 메트릭·선택take·youtube 링크). canonical=SQLite/trace. 샘플 trace 분리(`data/autopilot/sample_trace.jsonl`) + render out_dir 정리. 포트 8897 서빙. commits `4b26153`/`5b91f02`/`57f447a` |
+| PIPE-AUTO 조립 | 풀 앨범 파이프라인 | 06-14 | `autopilot/pipeline.py` song_pipeline(작사→…→업로드 전체 체인)/run_album/resume_song. 양쪽 human-gate(선택·승인) resume 메커니즘. concept '기획' step 영속화. e2e 9(2단 게이트+멱등성). commits `4a3f770`/`05c5deb` |
+| PIPE-F02 | 텔레그램 후보카드 /select + /resume 라이브 | 06-14 | `autopilot/cards.py`(build_selection_card/apply_selection/parse) + `bot.py` 순수추가(`/select` 인라인카드 + `^pipeauto:` 콜백 → selected_index 주입 resume). `/resume` 핸들러. 봇 라이브 가동 검증. commits `a919db0`/`2a682a6`/`9837401` |
+
 ## 2026-05
 
 | # | Task | Completed | Notes |

@@ -6,13 +6,11 @@
 |---|--------|----------|---------|------|
 | PIPE-F05 | Fix Drive service account JSON (bug) | P1 | user: GCP issuance | `client_secrets.json` is OAuth format. GCP console `music-lab-491900` → IAM → create service account → key JSON → save to `credentials/drive-sa.json` + update `.env GOOGLE_CREDENTIALS_PATH` |
 | PIPE-F10 | Auto-refresh YouTube OAuth refresh_token | P1 | — | Prevent recurrence of the token expiry hit in 4-1. Telegram warning 7 days before expiry + re-auth link |
-| PIPE-F12 | PIPE-AUTO 오케스트레이터 (자체 FSM 코어) | P1 | — | `autopilot/` state machine. runs/steps/human_tasks/artifacts SQLite + @step/@human_gate 데코레이터 + idempotency + claude_cli 래퍼 + trace 레이어. Phase 2 = 코어(키 불필요), 노드는 stub. 설계 SSOT: `plans/PIPE-AUTO.md` |
-| PIPE-F01 | 프리필터 (생성 후보 자동 추림) ※역할 재정의 | P1 | PIPE-F12 | (구 quality analyzer) pyloudnorm + librosa + Claude multimodal로 점수화 → 후보 N곡 중 사람 청취 전 자동 컷. PIPE-AUTO 프리필터 노드로 편입. `quality/{song_id}.json` |
-| PIPE-F02 | 텔레그램 후보카드 + /resume 핸들러 | P1 | PIPE-F12, PIPE-F01 | 후보 곡 카드 + 인라인 버튼(pick/extend/reject/edit). human_gate `awaiting_selection` 재개 트리거. pick 시 후처리 노드로 진행 |
 | 2-1 | Phase 1: Understand chord progressions (1 week) | P1 | — | Suno-linked learning curriculum |
-| 5-12 | Jazz Suite post-processing (loudness normalization) | P1 | 4-1 done | Correct volume deviation across tracks (-14 LUFS) — can reuse the PIPE-F04 lightweight path |
+| 5-12 | Jazz Suite post-processing (loudness normalization) | P1 | 4-1 done | Correct volume deviation across tracks (-14 LUFS) — can reuse the PIPE-F04 lightweight path. **PIPE-AUTO 후처리 노드(`autopilot/nodes/postprocess.py`)로 재사용 가능** |
 | 5-17b | 무색무취의 빈병 — post-processing + YouTube release | P1 | 5-17 selection done | After best-take selection, -14 LUFS post-processing → album video → YouTube publish |
-| PIPE-F11 | Fix suno_pipeline polling v2 missing bug | P1 | PIPE-F12 (생성 노드 편입) | Suno generates two songs (v1/v2) per generate call, but suno_pipeline.py polling terminates at the moment the first song completes. v2 is currently supplemented after the fact via suno_download.py. PIPE-AUTO 생성 노드(`autopilot/nodes/generate.py`)에서 v1/v2 모두 수확하도록 정식 구현. Workaround pattern verified in the batch script |
+
+> ✅ PIPE-F12/F01/F02/F11 → FINISHED 이동 (2026-06-13~14, PIPE-AUTO Phase 2~4 + F02 완료)
 
 ## P2
 
