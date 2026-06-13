@@ -1973,6 +1973,152 @@ async def cmd_resume(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 # ---------------------------------------------------------------------------
+# F02: PIPE-AUTO selection 후보 카드 (/select + 인라인 콜백) — 순수 추가
+# ---------------------------------------------------------------------------
+
+async def cmd_select(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/select [run_id] — awaiting_selection run의 후보 카드를 표시한다.
+
+    인수 없이 /select → awaiting_selection 상태 run 목록 안내.
+    /select <run_id> → 프리필터 통과 후보를 인라인 버튼 카드로 전송.
+    버튼을 누르면 _handle_pipeauto_callback 이 selected_index 를 주입해 재개한다.
+    """
+    if not await _check_auth(update):
+        return
+
+    # lazy import — autopilot 의존성 없이도 봇 import 성공 보장
+    try:
+        import autopilot.resume as _resume_mod
+        from autopilot.cards import build_selection_card as _build_card
+        from autopilot.store import Store as _Store
+    except ImportError as exc:
+        await update.message.reply_text(f"❌ autopilot 모듈 로드 실패: {exc}")
+        return
+
+    import os as _os
+    from pathlib import Path as _Path
+    _ap_db = _os.environ.get(
+        "AUTOPILOT_DB_PATH",
+        str(_Path(__file__).parent / "data" / "autopilot.db"),
+    )
+
+    try:
+        _store = _Store(_ap_db)
+    except Exception as exc:
+        await update.message.reply_text(f"❌ autopilot DB 열기 실패: {exc}")
+        return
+
+    parts = (update.message.text or "").split()[1:]
+
+    if not parts:
+        # awaiting_selection 인 것만 필터링해 안내
+        waiting = [
+            w for w in _resume_mod.list_awaiting(_store)
+            if w["kind"] == "selection"
+        ]
+        if not waiting:
+            await update.message.reply_text("후보 선택 대기 중인 곡이 없습니다.")
+            return
+        lines = ["후보 선택 대기 중인 곡:"]
+        for w in waiting:
+            lines.append(f"  run_id={w['run_id']}")
+        lines.append("\n카드 보기: /select <run_id>")
+        await update.message.reply_text("\n".join(lines))
+        return
+
+    run_id = parts[0]
+    try:
+        card = _build_card(_store, run_id)
+    except Exception as exc:
+        logger.error("select 카드 생성 오류: %s", exc)
+        await update.message.reply_text(f"❌ 카드 생성 실패: {exc}")
+        return
+
+    buttons = [
+        [InlineKeyboardButton(label, callback_data=cb)]
+        for (label, cb) in card["buttons"]
+    ]
+    if buttons:
+        buttons.append([InlineKeyboardButton("❌ 취소", callback_data="pipeauto:cancel")])
+        reply_markup = InlineKeyboardMarkup(buttons)
+    else:
+        reply_markup = None
+
+    await update.message.reply_text(card["text"], reply_markup=reply_markup)
+
+
+async def _handle_pipeauto_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """PIPE-AUTO selection 인라인 콜백 처리 — 후보 선택 → 파이프라인 재개."""
+    query = update.callback_query
+    if not query:
+        return
+    await query.answer()
+
+    if query.data == "pipeauto:cancel":
+        await query.edit_message_text("❌ 취소되었습니다.")
+        return
+
+    # lazy import
+    try:
+        from autopilot.cards import apply_selection as _apply
+        from autopilot.cards import parse_select_callback as _parse
+        from autopilot.store import Store as _Store
+    except ImportError as exc:
+        await query.edit_message_text(f"❌ autopilot 모듈 로드 실패: {exc}")
+        return
+
+    parsed = _parse(query.data or "")
+    if parsed is None:
+        await query.edit_message_text("❌ 잘못된 선택 데이터입니다.")
+        return
+    run_id, idx = parsed
+
+    import os as _os
+    from pathlib import Path as _Path
+    _ap_db = _os.environ.get(
+        "AUTOPILOT_DB_PATH",
+        str(_Path(__file__).parent / "data" / "autopilot.db"),
+    )
+    try:
+        _store = _Store(_ap_db)
+    except Exception as exc:
+        await query.edit_message_text(f"❌ autopilot DB 열기 실패: {exc}")
+        return
+
+    await query.edit_message_text(
+        f"⏳ 후보 {idx + 1} 선택 — 후처리·영상 진행 중..."
+    )
+
+    # resume 내부의 ffmpeg/youtube 는 느릴 수 있으므로 이벤트 루프 밖에서 실행
+    try:
+        result = await asyncio.to_thread(_apply, _store, run_id, idx)
+    except Exception as exc:
+        logger.error("pipeauto apply_selection 오류: %s", exc, exc_info=True)
+        await query.edit_message_text(f"❌ 선택 처리 실패: {exc}")
+        return
+
+    status = result.get("status", "unknown")
+    if status == "awaiting_publish_approval":
+        await query.edit_message_text(
+            f"✅ 후보 {idx + 1} 선택 — 후처리·영상 진행, "
+            "업로드 승인 대기('올려')"
+        )
+    elif status == "done":
+        await query.edit_message_text(f"✅ 후보 {idx + 1} 선택 — 완료(업로드까지 진행됨).")
+    elif status == "noop":
+        reason = result.get("reason", "이미 처리되었거나 대기 상태가 아닙니다.")
+        await query.edit_message_text(f"⚠️ 처리할 수 없습니다: {reason}")
+    elif status == "failed":
+        await query.edit_message_text(
+            f"❌ 후보 {idx + 1} 처리 실패: {result.get('error', '원인 불명')}"
+        )
+    else:
+        await query.edit_message_text(
+            f"후보 {idx + 1} 처리됨 (status={status})."
+        )
+
+
+# ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
 def main() -> None:
@@ -2010,6 +2156,8 @@ def main() -> None:
     app.add_handler(CommandHandler("youtube_stats", cmd_youtube_stats))
     app.add_handler(CommandHandler("oauth_status", cmd_oauth_status))
     app.add_handler(CommandHandler("resume", cmd_resume))
+    app.add_handler(CommandHandler("select", cmd_select))
+    app.add_handler(CallbackQueryHandler(_handle_pipeauto_callback, pattern="^pipeauto:"))
     app.add_handler(CallbackQueryHandler(_handle_suno_callback, pattern="^suno:"))
     app.add_handler(CallbackQueryHandler(_handle_youtube_callback, pattern="^youtube:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
