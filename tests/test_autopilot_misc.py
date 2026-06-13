@@ -105,25 +105,32 @@ class TestTrace:
 
 
 # ---------------------------------------------------------------------------
-# nodes stubs — NotImplementedError 확인
+# nodes stubs — Phase 4 stub 확인 (Phase 3 노드는 구현 완료)
 # ---------------------------------------------------------------------------
 class TestNodeStubs:
-    def test_generate_NotImplementedError(self):
-        from autopilot.nodes.generate import generate
-        with pytest.raises(NotImplementedError):
-            generate("테스트 프롬프트")
+    # Phase 3 구현 완료: generate_node, lyrics_node, suno_prompt_node, prefilter_node
+    # → NotImplementedError 테스트 제거. 대신 Phase 3 테스트는 test_autopilot_nodes_phase3.py 참조.
 
-    def test_write_lyrics_NotImplementedError(self):
+    # 하위 호환성 deprecated stub 함수들은 여전히 NotImplementedError를 발생시킨다.
+    def test_generate_deprecated_stub_제거됨(self):
+        """generate() 함수는 더 이상 존재하지 않음 — generate_node()로 교체됨."""
+        import autopilot.nodes.generate as gen_mod
+        assert hasattr(gen_mod, "generate_node"), "generate_node 함수가 없음"
+
+    def test_write_lyrics_deprecated_NotImplementedError(self):
+        """write_lyrics()는 deprecated stub으로 NotImplementedError를 발생시킨다."""
         from autopilot.nodes.lyrics import write_lyrics
         with pytest.raises(NotImplementedError):
             write_lyrics("앨범 컨셉")
 
     def test_build_prompt_NotImplementedError(self):
+        """build_prompt()는 Phase 2 stub으로 NotImplementedError를 발생시킨다."""
         from autopilot.nodes.prompt import build_prompt
         with pytest.raises(NotImplementedError):
             build_prompt("가사")
 
-    def test_prefilter_NotImplementedError(self):
+    def test_prefilter_deprecated_NotImplementedError(self):
+        """prefilter()는 deprecated stub으로 NotImplementedError를 발생시킨다."""
         from autopilot.nodes.prefilter import prefilter
         with pytest.raises(NotImplementedError):
             prefilter([])
