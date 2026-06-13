@@ -300,6 +300,44 @@ class TestAlbumPipelineE2E:
         open_task = m["store"].get_open_human_task(run_id, "selection")
         assert open_task is not None, "selection 게이트 open task 가 없음"
 
+    # ── Step 1b: concept canonical 영속화 + 복원 (앨범 제목 유실 방지) ─────────
+
+    def test_1b_concept_persisted_and_recoverable(self, all_mocks):
+        """run_album 후 '기획' step에 concept이 영속화되고 _load_concept가 복원한다.
+
+        회귀 방지: @step이 input_data를 저장하지 않아 '작사' concept이 NULL이 되면
+        봇이 빈 concept으로 resume → 영상/업로드 제목이 "무제"로 유실되던 버그.
+        '기획' step을 canonical 소스로 만들어 차단했는지 검증한다.
+        """
+        from autopilot.pipeline import run_album
+        from autopilot import cards
+
+        m = all_mocks
+        results = run_album(
+            store=m["store"],
+            album_slug=_ALBUM_SLUG,
+            song_concepts=[_CONCEPT],
+            deps=m["deps"],
+        )
+        run_id = results[0]["run_id"]
+
+        # '기획' step이 done 이고 input_json 에 concept 이 담겨 있어야 함
+        planning = m["store"].get_step(run_id, "기획")
+        assert planning is not None, "'기획' step 이 생성되지 않음"
+        assert planning["status"] == "done"
+        import json
+        assert json.loads(planning["input_json"])["title"] == _CONCEPT["title"]
+
+        # _load_concept 이 빈 dict 가 아닌 실제 concept(제목 포함)을 복원
+        loaded = cards._load_concept(m["store"], run_id)
+        assert loaded.get("title") == _CONCEPT["title"]
+        assert loaded == _CONCEPT
+
+        # build_selection_card 가 '무제'가 아닌 실제 제목을 표시
+        card = cards.build_selection_card(m["store"], run_id)
+        assert _CONCEPT["title"] in card["text"]
+        assert "무제" not in card["text"]
+
     # ── Step 2: resume → awaiting_publish_approval ────────────────────────────
 
     def test_2_resume_selection_awaiting_publish(self, all_mocks):
