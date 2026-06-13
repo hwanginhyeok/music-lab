@@ -1867,6 +1867,111 @@ async def cmd_oauth_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(f"❌ 상태 확인 실패: {e}")
 
 
+async def cmd_resume(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/resume [run_id] [choice] — 대기 중인 파이프라인 게이트를 재개한다.
+
+    인수 없이 /resume → 대기 중인 게이트 목록 표시.
+    /resume <run_id> <choice> → 해당 run_id의 open gate에 choice 답변 주입 후 재개.
+
+    publish_approval 게이트의 경우 "올려" 또는 "yes"로 승인할 수 있다.
+    """
+    if not await _check_auth(update):
+        return
+
+    # lazy import — autopilot 의존성이 없어도 봇 import 성공 보장
+    try:
+        import autopilot.resume as _resume_mod
+        from autopilot.store import Store as _Store
+    except ImportError as exc:
+        await update.message.reply_text(f"❌ autopilot 모듈 로드 실패: {exc}")
+        return
+
+    # autopilot DB 경로 (프로젝트 루트 기준)
+    import os as _os
+    from pathlib import Path as _Path
+    _ap_db = _os.environ.get(
+        "AUTOPILOT_DB_PATH",
+        str(_Path(__file__).parent / "data" / "autopilot.db"),
+    )
+
+    try:
+        _store = _Store(_ap_db)
+    except Exception as exc:
+        await update.message.reply_text(f"❌ autopilot DB 열기 실패: {exc}")
+        return
+
+    args_text = update.message.text or ""
+    # "/resume" 이후 부분 파싱
+    parts = args_text.split()[1:]  # 첫 토큰(/resume) 제거
+
+    if not parts:
+        # 대기 중인 게이트 목록 표시
+        waiting = _resume_mod.list_awaiting(_store)
+        if not waiting:
+            await update.message.reply_text("대기 중인 파이프라인 게이트가 없습니다.")
+            return
+
+        lines = ["대기 중인 게이트:"]
+        for w in waiting:
+            lines.append(f"  run_id={w['run_id']}  kind={w['kind']}  status={w['status']}")
+        lines.append("\n재개: /resume <run_id> <yes|no|올려>")
+        await update.message.reply_text("\n".join(lines))
+        return
+
+    if len(parts) < 2:
+        await update.message.reply_text(
+            "사용법: /resume <run_id> <yes|올려>  또는  /resume (목록)"
+        )
+        return
+
+    run_id, choice_raw = parts[0], parts[1]
+    choice = choice_raw.strip().lower()
+
+    # run 조회
+    run_row = _store.get_run(run_id)
+    if run_row is None:
+        await update.message.reply_text(f"❌ run_id 없음: {run_id}")
+        return
+
+    status = run_row["status"]
+    if not status.startswith("awaiting_"):
+        await update.message.reply_text(f"이 run은 대기 상태가 아닙니다 (status={status}).")
+        return
+
+    kind = status.removeprefix("awaiting_")
+
+    # publish_approval: "올려" / "yes" → approve_publish 헬퍼 사용
+    if kind == "publish_approval" and choice in ("올려", "yes", "y"):
+        try:
+            from autopilot.gate import approve_publish as _approve
+            _approve(_store, run_id)
+            await update.message.reply_text(
+                f"✅ run {run_id} 게시 승인 완료.\n"
+                "파이프라인은 다음 실행 시 게이트를 통과합니다."
+            )
+        except Exception as exc:
+            logger.error("publish_approval 오류: %s", exc)
+            await update.message.reply_text(f"❌ 승인 실패: {exc}")
+        return
+
+    # 일반 게이트: answer dict 주입 (파이프라인 함수는 봇에서 재구성 불가이므로 answer만 기록)
+    open_task = _store.get_open_human_task(run_id, kind)
+    if open_task is None:
+        await update.message.reply_text(f"kind={kind} 에 대한 open task가 없습니다.")
+        return
+
+    try:
+        import time as _time
+        _store.answer_human_task(open_task["id"], {"choice": choice, "ts": _time.time()})
+        await update.message.reply_text(
+            f"✅ run {run_id} 게이트 '{kind}' 에 답변 등록: {choice!r}\n"
+            "파이프라인 재실행은 별도로 트리거하세요 (/pipeline 등)."
+        )
+    except Exception as exc:
+        logger.error("resume 오류: %s", exc)
+        await update.message.reply_text(f"❌ 재개 실패: {exc}")
+
+
 # ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
@@ -1904,6 +2009,7 @@ def main() -> None:
     app.add_handler(CommandHandler("youtube_delete", cmd_youtube_delete))
     app.add_handler(CommandHandler("youtube_stats", cmd_youtube_stats))
     app.add_handler(CommandHandler("oauth_status", cmd_oauth_status))
+    app.add_handler(CommandHandler("resume", cmd_resume))
     app.add_handler(CallbackQueryHandler(_handle_suno_callback, pattern="^suno:"))
     app.add_handler(CallbackQueryHandler(_handle_youtube_callback, pattern="^youtube:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
