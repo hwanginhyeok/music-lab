@@ -17,6 +17,7 @@ Claude Code CLI의 OAuth 인증을 그대로 사용.
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import io
 import json
 import logging
@@ -58,6 +59,39 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger("music-lab")
+
+# ---------------------------------------------------------------------------
+# 단일 인스턴스 잠금 (PIPE-F14)
+# ---------------------------------------------------------------------------
+_INSTANCE_LOCK_FH = None  # 전역 — fd가 GC/close되지 않게 유지 (잠금은 프로세스 생존 동안 유지)
+
+
+def _acquire_single_instance_lock(lock_path: str = None) -> None:
+    """중복 bot.py 인스턴스 방지. 이미 실행 중이면 경고 후 즉시 종료.
+    (같은 텔레그램 토큰 2개가 getUpdates 폴링해 메시지 가로채는 사고 차단 — PIPE-F14)"""
+    global _INSTANCE_LOCK_FH
+    if lock_path is None:
+        lock_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", ".music-bot.lock"
+        )
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+    fh = open(lock_path, "w")
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (BlockingIOError, OSError):
+        logger.error(
+            "이미 실행 중인 music-bot 인스턴스가 있습니다 — 중복 실행 차단, 종료. "
+            "(운영은 systemd music-bot만 사용)"
+        )
+        raise SystemExit(1)
+    _INSTANCE_LOCK_FH = fh  # 잠금 유지
+    try:
+        fh.write(str(os.getpid()))
+        fh.flush()
+    except Exception:
+        pass
+    logger.info("단일 인스턴스 잠금 획득 (%s)", lock_path)
+
 
 SYSTEM_PROMPT = """너는 Music Lab 봇이다. 음악 작곡/작사/이론을 가르치는 AI 뮤직 튜터.
 
@@ -2122,6 +2156,7 @@ async def _handle_pipeauto_callback(update: Update, ctx: ContextTypes.DEFAULT_TY
 # 메인
 # ---------------------------------------------------------------------------
 def main() -> None:
+    _acquire_single_instance_lock()  # 중복 폴러 차단 (PIPE-F14) — 텔레그램 setup 전 최우선
     logger.info("Music Lab 봇 시작 (Claude CLI 로컬 모드)")
     if ALLOWED_USERS:
         logger.info("ALLOWED_USERS 화이트리스트 활성: %s", ALLOWED_USERS)

@@ -160,6 +160,8 @@ systemctl --user restart music-bot   # restart after bot code changes
 journalctl --user -u music-bot -f    # check logs
 ```
 
+> **Run only via systemd `music-bot`.** Do NOT manually run `python3 bot.py` — a duplicate poller steals Telegram updates (the /select-click interception incident, PIPE-F14). A single-instance lock (`data/.music-bot.lock`) makes any duplicate exit immediately, but for dev testing still stop systemd first (`systemctl --user stop music-bot`) before running standalone.
+
 ## Agents (`.claude/agents/`)
 
 | Agent | Role | Model |

@@ -25,3 +25,4 @@
 - After changing bot code: `systemctl --user restart music-bot`
 - Check logs: `journalctl --user -u music-bot -f`
 - Restart is unnecessary when only the DB is changed without service interruption
+- **Run only via systemd `music-bot` — never manual `python3 bot.py`** (a duplicate poller steals Telegram updates; PIPE-F14). A single-instance lock makes duplicates exit immediately, but stop systemd first for dev testing.
