@@ -221,6 +221,15 @@ def run_album(
     for concept in song_concepts:
         title = concept.get("title", "무제")
         run_id = store.create_run(album_slug)
+
+        # concept을 canonical 하게 '기획'(planning) step의 input_json에 영속화한다.
+        # @step은 input_data를 저장하지 않으므로 '작사' step의 concept이 NULL이 되는
+        # 문제(앨범 제목 유실 → "무제")를 여기서 원천 차단한다.
+        # 앨범 생성 시 단 1회만 실행되며(song_pipeline 밖), '작사'부터 시작하는
+        # song_pipeline의 step 이름과 충돌하지 않으므로 resume 시 재실행되지 않는다.
+        store.start_step(run_id, "기획", input_data=concept)
+        store.finish_step(run_id, "기획", {"recorded": True})
+
         store.update_run_status(run_id, "running")
         ctx = Ctx(run_id=run_id, store=store)
 
