@@ -240,7 +240,16 @@ class SunoClient:
         options = Options()
         options.debugger_address = f"127.0.0.1:{CHROME_DEBUG_PORT}"
         self._driver = webdriver.Chrome(options=options)
-        logger.info("Chrome 연결 완료 (port=%d)", CHROME_DEBUG_PORT)
+        # 명시적 timeout 설정 — Suno SPA의 load 이벤트가 지연되면 driver.get이
+        # 기본값(무한)에서 urllib3 socket read timeout(120s)까지 블로킹되어
+        # 불투명한 ReadTimeoutError로 실패하는 문제 방지(PIPE-AUTO e2e hang RC).
+        # page_load(45s)/script(30s) 모두 120s 미만으로 빠르게 실패시켜 디버깅 가능하게 함.
+        try:
+            self._driver.set_page_load_timeout(45)
+            self._driver.set_script_timeout(30)
+        except Exception as e:
+            logger.warning("timeout 설정 실패 (계속 진행): %s", e)
+        logger.info("Chrome 연결 완료 (port=%d, page_load=45s, script=30s)", CHROME_DEBUG_PORT)
         return self._driver
 
     def _detect_captcha(self) -> bool:
@@ -537,11 +546,19 @@ class SunoClient:
         driver = self._get_driver()
         logger.info("Suno 곡 생성 시작: %s (model=%s)", title or "무제", model)
 
-        # 페이지 상태 초기화 — 다른 페이지 갔다가 Create로 복귀
-        driver.get("https://suno.com/explore")
-        time.sleep(3)
-        driver.get("https://suno.com/create")
-        time.sleep(5)
+        # 페이지 상태 초기화 — 다른 페이지 갔다가 Create로 복귀.
+        # _get_driver()에서 page_load_timeout=45s 설정됨 → load 이벤트 지연 시
+        # 120s 불투명 hang 대신 45s 내 TimeoutException으로 빠르게 실패.
+        # SPA는 load 이벤트 후에도 추가 렌더가 필요하므로 timeout이 떠도
+        # DOM은 사용 가능 — 폼 셀렉터로 준비 여부를 따로 확인한다.
+        from selenium.common.exceptions import TimeoutException as _PageLoadTimeout
+        for _nav_url in ("https://suno.com/explore", "https://suno.com/create"):
+            try:
+                driver.get(_nav_url)
+            except _PageLoadTimeout:
+                # load 이벤트 미발생 — DOM이 이미 떠 있으면 진행 가능하므로 경고만
+                logger.warning("페이지 로드 timeout(45s): %s — DOM 확인 후 계속", _nav_url)
+            time.sleep(3 if _nav_url.endswith("explore") else 5)
 
         if not self._wait_captcha():
             raise SunoError("캡차 해결 실패")
@@ -551,6 +568,25 @@ class SunoClient:
         from selenium.webdriver.support import expected_conditions as EC
 
         wait = WebDriverWait(driver, 15)
+
+        # Create 폼 준비 확인 — lyrics textarea가 핵심 앵커.
+        # page_load timeout이 떠도 DOM이 준비됐는지 여기서 명시적으로 검증,
+        # 미준비면 불투명 hang 대신 빠른 명시적 에러로 실패.
+        try:
+            wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, 'textarea[data-testid="lyrics-textarea"]')
+            ))
+            logger.info("Create 폼 로드 확인 (lyrics-textarea 존재)")
+        except Exception:
+            ts = int(time.time())
+            try:
+                Path('data/debug').mkdir(parents=True, exist_ok=True)
+                driver.save_screenshot(f'data/debug/create_form_not_ready_{ts}.png')
+            except Exception:
+                pass
+            raise SunoError(
+                f"Create 폼 미로드 (lyrics-textarea 없음, url={driver.current_url})"
+            )
 
         # 쿠키 배너 닫기
         try:
@@ -625,15 +661,25 @@ class SunoClient:
             all_tas = driver.find_elements(By.TAG_NAME, 'textarea')
             visible_tas = [t for t in all_tas if t.is_displayed()]
 
-            # lyrics textarea: placeholder에 'lyrics' 포함하거나 첫 번째
+            # lyrics textarea 식별 — data-testid='lyrics-textarea'가 안정 앵커.
+            # (placeholder는 '[Verse]This is where...'로 바뀌어 'lyric' 문자열이
+            #  더 이상 안 들어감 → 기존 placeholder 휴리스틱은 lyrics_ta=None으로
+            #  떨어져 Create 비활성 hang을 유발하던 stale 셀렉터. 라이브 DOM 확인 완료.)
             lyrics_ta = None
             style_ta = None
             for t in visible_tas:
-                ph = (t.get_attribute('placeholder') or '').lower()
-                if 'lyric' in ph or 'write some' in ph:
+                if (t.get_attribute('data-testid') or '') == 'lyrics-textarea':
                     lyrics_ta = t
                 else:
                     style_ta = t
+            # 폴백: testid 못 찾으면 기존 placeholder 휴리스틱
+            if lyrics_ta is None:
+                for t in visible_tas:
+                    ph = (t.get_attribute('placeholder') or '').lower()
+                    if 'lyric' in ph or 'write some' in ph or 'rhyme' in ph:
+                        lyrics_ta = t
+                    elif style_ta is None or style_ta is lyrics_ta:
+                        style_ta = t
 
             def _js_click_and_type(element, text):
                 """JS click → ActionChains type (element not interactable 우회)."""
