@@ -747,52 +747,152 @@ class SunoClient:
 
         time.sleep(1)
 
-        # API로 기존 곡 ID 수집
+        # API로 제출 baseline 수집 (기존 곡 ID + 크레딧).
+        # 캡차 우회/제출 성사 신호는 셀렉터 무관하게 "크레딧 감소 OR 곡수 증가"로 판정.
         api = self._get_api()
         existing_ids = {s["id"] for s in api.get_songs(page=0) if s.get("id")}
         logger.info("기존 곡 %d개", len(existing_ids))
-
-        # Create 버튼 클릭 (element.click 실패 시 JS click 폴백)
-        create_btn = None
-        for b in driver.find_elements(By.TAG_NAME, "button"):
-            try:
-                if not (b.is_displayed() and b.is_enabled()):
-                    continue
-                label = (b.get_attribute("aria-label") or "").lower()
-                txt = (b.text or "").strip()
-                if txt == "Create" or "create song" in label:
-                    create_btn = b
-                    break
-            except Exception:
-                continue
-
-        if not create_btn:
-            raise SunoError("Create 버튼을 찾을 수 없습니다")
-
         try:
-            create_btn.click()
-            logger.info("Create 버튼 클릭 (selenium)")
-        except Exception as e1:
-            logger.warning("element.click 실패 (%s) — JS click 폴백", type(e1).__name__)
-            try:
-                driver.execute_script("arguments[0].click();", create_btn)
-                logger.info("Create 버튼 클릭 (JS)")
-            except Exception as e2:
-                raise SunoError(f"Create 클릭 실패: {e2}") from e2
+            baseline_credits = api.get_credits()
+        except Exception:
+            baseline_credits = None
+        baseline_count = len(existing_ids)
+        print(
+            f'[제출 baseline] 크레딧 {baseline_credits} / 곡수 {baseline_count}',
+            flush=True,
+        )
 
-        # 진단: Create 클릭 직후 5초간 변화 캡처
-        ts0 = int(time.time())
-        for k in range(5):
-            time.sleep(1)
+        def _locate_create_btn():
+            """generate()와 동일한 Create 버튼 로케이터 — 매번 fresh 재탐색.
+            (캡차 후 DOM이 갱신될 수 있으므로 stale 참조 방지)."""
+            for b in driver.find_elements(By.TAG_NAME, "button"):
+                try:
+                    if not (b.is_displayed() and b.is_enabled()):
+                        continue
+                    label = (b.get_attribute("aria-label") or "").lower()
+                    txt = (b.text or "").strip()
+                    if txt == "Create" or "create song" in label:
+                        return b
+                except Exception:
+                    continue
+            return None
+
+        def _click_create(btn) -> None:
+            """element.click 실패 시 JS click 폴백."""
             try:
-                driver.save_screenshot(f'data/debug/poc6_after_create_{ts0}_{k}.png')
-                print(f'[Create+{k+1}s] url={driver.current_url} title={driver.title!r}', flush=True)
+                btn.click()
+                logger.info("Create 버튼 클릭 (selenium)")
+            except Exception as e1:
+                logger.warning(
+                    "element.click 실패 (%s) — JS click 폴백", type(e1).__name__
+                )
+                try:
+                    driver.execute_script("arguments[0].click();", btn)
+                    logger.info("Create 버튼 클릭 (JS)")
+                except Exception as e2:
+                    raise SunoError(f"Create 클릭 실패: {e2}") from e2
+
+        def _submission_confirmed():
+            """크레딧 감소 OR 곡수 증가 → 제출 성사. (credits_now, count_now, ok) 반환."""
+            credits_now = baseline_credits
+            try:
+                api.refresh_jwt()
+                credits_now = api.get_credits()
             except Exception:
                 pass
+            count_now = baseline_count
+            try:
+                songs_now = api.get_songs(page=0)
+                count_now = len({s["id"] for s in songs_now if s.get("id")})
+            except Exception:
+                pass
+            credit_dropped = (
+                baseline_credits is not None
+                and credits_now is not None
+                and credits_now < baseline_credits
+            )
+            count_rose = count_now > baseline_count
+            return credits_now, count_now, (credit_dropped or count_rose)
 
-        time.sleep(3)
-        if not self._wait_captcha():
-            raise SunoError("Create 후 캡차 해결 실패")
+        # === Bug #2 fix: 제출 성사 확인 + 재제출 루프 (최대 3회) ===
+        # 캡차가 Create 제출을 소거하는 케이스 대비: 클릭 → 캡차 해결 →
+        # 크레딧/곡수로 제출 성사 검증, 미성사면 Create 재클릭.
+        MAX_SUBMITS = 3
+        CONFIRM_ITERATIONS = 5   # 약 10초 (2초 × 5)
+        CONFIRM_INTERVAL = 2
+        captcha_count = 0
+        submission_ok = False
+
+        for attempt in range(1, MAX_SUBMITS + 1):
+            create_btn = _locate_create_btn()
+            if not create_btn:
+                raise SunoError("Create 버튼을 찾을 수 없습니다")
+
+            logger.info("제출 시도 %d/%d — Create 클릭", attempt, MAX_SUBMITS)
+            print(f'[제출 시도 {attempt}/{MAX_SUBMITS}] Create 클릭', flush=True)
+            _click_create(create_btn)
+
+            # 진단: Create 클릭 직후 3초간 변화 캡처
+            ts0 = int(time.time())
+            for k in range(3):
+                time.sleep(1)
+                try:
+                    driver.save_screenshot(
+                        f'data/debug/poc6_after_create_{ts0}_{k}.png'
+                    )
+                    print(
+                        f'[Create+{k+1}s] url={driver.current_url} '
+                        f'title={driver.title!r}',
+                        flush=True,
+                    )
+                except Exception:
+                    pass
+
+            # 캡차 발생 가능 — 감지/해결 (재클릭 시에도 또 뜰 수 있음 = 예상 event-touch)
+            if self._detect_captcha():
+                captcha_count += 1
+                logger.info(
+                    "캡차 감지 (누적 %d회) — 해결 대기 [제출 시도 %d]",
+                    captcha_count, attempt,
+                )
+            if not self._wait_captcha():
+                raise SunoError("Create 후 캡차 해결 실패")
+
+            # 제출 성사 폴링 (약 10초): 크레딧 감소 OR 곡수 증가?
+            credits_now, count_now = baseline_credits, baseline_count
+            for _ in range(CONFIRM_ITERATIONS):
+                time.sleep(CONFIRM_INTERVAL)
+                credits_now, count_now, ok = _submission_confirmed()
+                if ok:
+                    submission_ok = True
+                    break
+
+            print(
+                f'[제출 확인 {attempt}/{MAX_SUBMITS}] '
+                f'크레딧 {baseline_credits}→{credits_now} / '
+                f'곡수 {baseline_count}→{count_now} / '
+                f'캡차 {captcha_count}회 / 성사={submission_ok}',
+                flush=True,
+            )
+
+            if submission_ok:
+                logger.info(
+                    "제출 성사 확인 (크레딧 %s→%s / 곡수 %s→%s)",
+                    baseline_credits, credits_now, baseline_count, count_now,
+                )
+                break
+
+            logger.warning(
+                "제출 미성사 (시도 %d/%d) — 크레딧/곡수 변화 없음, Create 재클릭",
+                attempt, MAX_SUBMITS,
+            )
+
+        if not submission_ok:
+            _send_telegram(
+                f"❌ Suno 제출 재시도 {MAX_SUBMITS}회 실패 — 생성 큐 진입 실패 "
+                f"(캡차 {captcha_count}회)"
+            )
+            raise SunoError("제출 재시도 3회 실패 — 생성 큐 진입 실패")
 
         # API 폴링으로 생성 완료 대기 (기본 5분, SUNO_POLL_TIMEOUT 환경변수로 조정 가능)
         logger.info("곡 생성 대기 중... (API 폴링)")
