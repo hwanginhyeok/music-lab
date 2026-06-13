@@ -31,4 +31,3 @@
 | 2-4 | Phase 4: Intro to DAW production (2~4 weeks) | P3 | 2-3 done | |
 | 3-4 | Voice message input → humming analysis | P3 | — | |
 | 6-1 | Build YouTube management pipeline | P3 | — | Implement /youtube_list (list), /youtube_delete (delete), and stats features. Re-evaluate once channel content is sufficiently accumulated |
-| PIPE-F14 | 좀비 bot.py 재발방지 — systemd-only 가드 | P3 | — | 2026-06-14 사고: 6/7부터 떠있던 수동 `python3 bot.py`(PID 365) 좀비가 같은 텔레그램 토큰을 getUpdates 폴링 → 형님 `/select`+버튼클릭이 좀비(구코드)에게 가로채여 증발(systemd 봇은 미수신). 수동 kill로 해결. 재발방지: (a) `bot.py` 시작 시 기존 인스턴스 감지하면 경고+종료(pidfile/flock 또는 `getUpdates` 충돌 감지) (b) 운영은 systemd `music-bot`만 — 수동 실행 금지 문서화/가드. 텔레그램 단일 폴러 보장 |
