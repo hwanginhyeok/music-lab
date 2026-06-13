@@ -12,6 +12,8 @@
 | PIPE-AUTO 저널 | HTML 프로비넌스 저널 + 샘플 런 | 06-14 | `autopilot/journal.py` 시더+Jinja2 렌더(노드 타임라인·Suno프롬프트 전문·후보 메트릭·선택take·youtube 링크). canonical=SQLite/trace. 샘플 trace 분리(`data/autopilot/sample_trace.jsonl`) + render out_dir 정리. 포트 8897 서빙. commits `4b26153`/`5b91f02`/`57f447a` |
 | PIPE-AUTO 조립 | 풀 앨범 파이프라인 | 06-14 | `autopilot/pipeline.py` song_pipeline(작사→…→업로드 전체 체인)/run_album/resume_song. 양쪽 human-gate(선택·승인) resume 메커니즘. concept '기획' step 영속화. e2e 9(2단 게이트+멱등성). commits `4a3f770`/`05c5deb` |
 | PIPE-F02 | 텔레그램 후보카드 /select + /resume 라이브 | 06-14 | `autopilot/cards.py`(build_selection_card/apply_selection/parse) + `bot.py` 순수추가(`/select` 인라인카드 + `^pipeauto:` 콜백 → selected_index 주입 resume). `/resume` 핸들러. 봇 라이브 가동 검증. commits `a919db0`/`2a682a6`/`9837401` |
+| PIPE-AUTO 실데이터 e2e | generate 우회 풀루프 검증 (게이트~publish-gate) | 06-14 | D-001(Suno 자동생성 차단, hCaptcha 벽 실측 재확인: 형님 캡차 3회 풀어도 제출 미큐잉) 우회 — 실곡 후보 주입 → 프리필터→[형님 후보선택]→후처리(실 -14LUFS)→영상(실 1080p h264/aac)→publish_approval 게이트 정지·업로드 0. suno_client Bug#1(hang)+Bug#2(재제출) 수정 포함. 좀비 bot.py(PID365) 업데이트 가로채기 사고 발견·제거. commits `127cf2b`/`a063e7e` 등 |
+| PIPE-F13 | postprocess 2-pass loudnorm — LUFS 정밀도 ±0.0 | 06-14 | 1-pass→2-pass(pass1 측정 → pass2 measured_*+offset+linear=true)+`-b:a 320k`(저비트레이트 라우드니스 시프트 차단)+devnull sink. 실측: 원본 -14.10 → 1-pass -13.52(오차0.48) → **2-pass -14.00(오차0.00)**. 측정실패 1-pass 폴백. pytest 201. commits `43e015e`/`5e3c224` |
 
 ## 2026-05
 

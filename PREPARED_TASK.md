@@ -20,7 +20,6 @@
 
 | # | Task | Priority | depends | Notes |
 |---|--------|----------|---------|------|
-| PIPE-F13 | postprocess 2-pass loudnorm — LUFS 정밀도↑ | P2 | — | 현재 `autopilot/nodes/postprocess.py`는 ffmpeg **1-pass** `loudnorm=I=-14`. 실 e2e(run 86494cf1d566, 후보 6bf985d1) 측정: 원본 -14.10 → 후처리 **-13.52**(타겟 -14, ~0.48 LU 오차, 1-pass 오버슈트). **2-pass**(1차 측정 `print_format=json` → measured_I/LRA/TP/thresh를 2차 인자로 주입)로 ±0.1 LU 정밀도 확보. 스트리밍 허용(-14±1) 내지만 앨범 릴리즈 품질용 개선 |
 | 2-2 | Phase 2: Writing melodies (1~2 weeks) | P2 | 2-1 done | |
 | 2-3 | Phase 3: Designing song structure (1~2 weeks) | P2 | 2-2 done | |
 | 3-3 | Chord progression visualization (image generation) | P2 | — | |
