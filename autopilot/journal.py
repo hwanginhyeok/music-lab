@@ -25,6 +25,15 @@ from autopilot import trace as _trace
 from autopilot.store import Store
 
 # ---------------------------------------------------------------------------
+# 경로 상수
+# ---------------------------------------------------------------------------
+
+_PROJECT_ROOT = Path(__file__).parent.parent
+
+# 샘플 전용 trace 파일 — 공유 live trace(logs/traces/trace.jsonl)와 분리
+SAMPLE_TRACE_PATH = str(_PROJECT_ROOT / "data" / "autopilot" / "sample_trace.jsonl")
+
+# ---------------------------------------------------------------------------
 # 샘플 앨범 상수
 # ---------------------------------------------------------------------------
 
@@ -331,15 +340,31 @@ _YOUTUBE_URLS = [
 # A) seed_sample_run
 # ---------------------------------------------------------------------------
 
-def seed_sample_run(store: Store, data_dir: str | Path) -> list[str]:
-    """샘플 앨범을 SQLite + trace.jsonl에 직접 시딩한다.
+def seed_sample_run(
+    store: Store,
+    data_dir: str | Path,
+    trace_path: str = SAMPLE_TRACE_PATH,
+) -> list[str]:
+    """샘플 앨범을 SQLite + 샘플 전용 trace 파일에 직접 시딩한다.
 
     이미 동일 album_slug의 run이 존재하면 삭제 후 재생성 (멱등 실행).
+    실행 시작 시 샘플 trace 파일(및 그 .sidecar/)을 초기화하여
+    이번 seed 실행의 이벤트만 담기도록 한다.
+    공유 live trace(logs/traces/trace.jsonl)는 절대 건드리지 않는다.
 
     returns: 생성된 run_id 목록
     """
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
+
+    # 샘플 trace 초기화 — 이번 seed 이벤트만 남기기 위해 기존 파일 제거
+    sample_trace = Path(trace_path)
+    if sample_trace.exists():
+        sample_trace.unlink()
+    sample_sidecar = sample_trace.parent / ".sidecar"
+    if sample_sidecar.exists():
+        import shutil
+        shutil.rmtree(sample_sidecar)
 
     # 기존 샘플 run 정리 (멱등)
     existing_runs = store.conn.execute(
@@ -405,7 +430,7 @@ def seed_sample_run(store: Store, data_dir: str | Path) -> list[str]:
             "lyrics_path": str(lyrics_path),
             "sha256": lyrics_sha,
             "ts": t,
-        })
+        }, trace_path=trace_path)
 
         # ── Suno프롬프트 ──────────────────────────────────────────────────────
         t_step_start = t
@@ -434,7 +459,7 @@ def seed_sample_run(store: Store, data_dir: str | Path) -> list[str]:
             "prompt_path": str(suno_prompt_path),
             "sha256": suno_sha,
             "ts": t,
-        })
+        }, trace_path=trace_path)
 
         # ── 생성 ─────────────────────────────────────────────────────────────
         t_step_start = t
@@ -477,7 +502,7 @@ def seed_sample_run(store: Store, data_dir: str | Path) -> list[str]:
             "run_id": run_id,
             "candidate_count": len(candidates_out),
             "ts": t,
-        })
+        }, trace_path=trace_path)
 
         # ── 프리필터 ──────────────────────────────────────────────────────────
         t_step_start = t
@@ -506,7 +531,7 @@ def seed_sample_run(store: Store, data_dir: str | Path) -> list[str]:
                 "metrics": metrics,
                 "result": reason or "pass",
                 "ts": t + cand_idx * 5,
-            })
+            }, trace_path=trace_path)
 
             if reason is None:
                 passed.append(cand_with_metrics)
@@ -530,7 +555,7 @@ def seed_sample_run(store: Store, data_dir: str | Path) -> list[str]:
             "passed_count": len(passed),
             "rejected_count": len(rejected),
             "ts": t,
-        })
+        }, trace_path=trace_path)
 
         # ── human_task: selection ─────────────────────────────────────────────
         t += 10
@@ -588,7 +613,7 @@ def seed_sample_run(store: Store, data_dir: str | Path) -> list[str]:
             "run_id": run_id,
             "youtube_url": yt_url,
             "ts": t,
-        })
+        }, trace_path=trace_path)
 
         # ── run 완료 ─────────────────────────────────────────────────────────
         store.conn.execute(
@@ -597,7 +622,7 @@ def seed_sample_run(store: Store, data_dir: str | Path) -> list[str]:
         )
         store.conn.commit()
 
-    _trace.flush()
+    _trace.flush(trace_path=trace_path)
     return run_ids
 
 
@@ -710,7 +735,7 @@ _INDEX_TEMPLATE = """\
 </div>
 {% endfor %}
 
-<p class="gen-note">이 저널은 자동 생성된 파일입니다. 원본: SQLite + trace.jsonl<br>
+<p class="gen-note">이 저널은 자동 생성된 파일입니다. 원본: SQLite + data/autopilot/sample_trace.jsonl<br>
 재생성: <code>python3 -m autopilot.journal --seed --render</code></p>
 </body>
 </html>
@@ -991,7 +1016,7 @@ _RUN_TEMPLATE = """\
 <!-- 이벤트 타임라인 (trace.jsonl) -->
 {% if trace_events %}
 <div class="section">
-  <div class="section-title">이벤트 타임라인 (trace.jsonl)</div>
+  <div class="section-title">이벤트 타임라인 (sample_trace.jsonl)</div>
   <table>
     <thead>
       <tr><th>시각</th><th>이벤트</th><th>상세</th></tr>
@@ -1312,7 +1337,7 @@ def _main() -> None:
     parser.add_argument(
         "--trace",
         default=None,
-        help="trace.jsonl 경로 (기본: logs/traces/trace.jsonl)",
+        help="trace.jsonl 경로 (기본: data/autopilot/sample_trace.jsonl)",
     )
     parser.add_argument(
         "--data",
@@ -1328,9 +1353,8 @@ def _main() -> None:
     store = Store(str(db_path))
 
     if args.trace is None:
-        # store.py 기준 프로젝트 루트 로그 경로
-        project_root = Path(__file__).parent.parent
-        trace_path = str(project_root / "logs" / "traces" / "trace.jsonl")
+        # 샘플 저널 전용 trace — 공유 live trace와 분리
+        trace_path = SAMPLE_TRACE_PATH
     else:
         trace_path = args.trace
 
