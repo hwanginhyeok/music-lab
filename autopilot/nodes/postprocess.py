@@ -46,7 +46,7 @@ def _pass1_cmd(src: Path) -> list[str]:
             f"loudnorm=I={_TARGET_LUFS}:TP={_TARGET_TP}:LRA={_TARGET_LRA}"
             ":print_format=json"
         ),
-        "-f", "null", "-",
+        "-f", "null", os.devnull,
     ]
 
 
