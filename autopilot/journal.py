@@ -583,11 +583,110 @@ def seed_sample_run(
         }
         store.answer_human_task(task_id_row, selection_answer)
 
-        # ── 업로드 (Phase-4 플레이스홀더) ─────────────────────────────────────
+        # ── 후처리 (Phase-4: 마스터링 → -14 LUFS) ─────────────────────────────
+        t_step_start = t
+        t += 90  # 1.5분 소요
+
+        # 선택된 테이크의 측정 LUFS (마스터링 후 -14 근처로 수렴)
+        selected_measured_lufs = -14.1
+        mastered_path = run_dir / "mastered.wav"
+        mastered_content = (
+            f"[SAMPLE PLACEHOLDER — 실제 오디오 없음]\n"
+            f"곡: {song['title']}\n"
+            f"마스터링 결과 (Matchering + -14 LUFS 라우드니스 정규화)\n"
+            f"원본 후보: {selected_cand['path']}\n"
+            f"목표 LUFS: -14 / 측정 LUFS: {selected_measured_lufs}\n"
+        )
+        mastered_path.write_text(mastered_content, encoding="utf-8")
+        mastered_sha = hashlib.sha256(mastered_content.encode()).hexdigest()
+
+        postprocess_output = {
+            "path": str(mastered_path),
+            "sha256": mastered_sha,
+            "lufs_target": -14,
+            "measured_lufs": selected_measured_lufs,
+            "note": "[SAMPLE] Phase-4 마스터링 플레이스홀더 — 실제 처리 아님",
+        }
+        store.conn.execute(
+            """INSERT INTO steps (run_id, step_name, status, attempt, input_json, output_json, started_at, ended_at)
+               VALUES (?, '후처리', 'done', 1, ?, ?, ?, ?)""",
+            (
+                run_id,
+                json.dumps({"audio_path": selected_cand["path"]}),
+                json.dumps(postprocess_output),
+                t_step_start, t,
+            ),
+        )
+        store.conn.commit()
+        store.add_artifact(
+            run_id, "후처리", "audio_mastered", str(mastered_path), mastered_sha,
+            meta={"measured_lufs": selected_measured_lufs, "target": -14},
+        )
+        _trace.emit({
+            "event": "postprocess_done",
+            "run_id": run_id,
+            "path": str(mastered_path),
+            "measured_lufs": selected_measured_lufs,
+            "lufs_target": -14,
+            "ts": t,
+        }, trace_path=trace_path)
+
+        # ── 영상 (Phase-4: 커버 + 마스터 오디오 → MP4) ────────────────────────
+        t_step_start = t
+        t += 45  # 45초 소요
+
+        # 선택 테이크 길이를 영상 길이로 사용
+        selected_duration = selected_cand.get("metrics", {}).get("duration_sec", 0.0)
+        video_path = run_dir / "video.mp4"
+        video_content = (
+            f"[SAMPLE PLACEHOLDER — 실제 영상 없음]\n"
+            f"곡: {song['title']}\n"
+            f"커버 이미지 + 마스터 오디오 → MP4\n"
+            f"오디오: {mastered_path}\n"
+            f"길이: {selected_duration}s\n"
+        )
+        video_path.write_text(video_content, encoding="utf-8")
+        video_sha = hashlib.sha256(video_content.encode()).hexdigest()
+
+        video_output = {
+            "path": str(video_path),
+            "sha256": video_sha,
+            "duration_sec": selected_duration,
+            "note": "[SAMPLE] Phase-4 영상 플레이스홀더 — 실제 렌더 아님",
+        }
+        store.conn.execute(
+            """INSERT INTO steps (run_id, step_name, status, attempt, input_json, output_json, started_at, ended_at)
+               VALUES (?, '영상', 'done', 1, ?, ?, ?, ?)""",
+            (
+                run_id,
+                json.dumps({"audio_path": str(mastered_path), "title": song["title"]}),
+                json.dumps(video_output),
+                t_step_start, t,
+            ),
+        )
+        store.conn.commit()
+        store.add_artifact(
+            run_id, "영상", "video", str(video_path), video_sha,
+            meta={"duration_sec": selected_duration},
+        )
+        _trace.emit({
+            "event": "video_done",
+            "run_id": run_id,
+            "path": str(video_path),
+            "duration_sec": selected_duration,
+            "ts": t,
+        }, trace_path=trace_path)
+
+        # ── 업로드 (Phase-4: YouTube unlisted) ────────────────────────────────
         t_step_start = t
         t += 30
 
+        # 가짜 video_id 추출 (youtu.be/XXXX 형식)
+        fake_video_id = yt_url.rsplit("/", 1)[-1]
         upload_output = {
+            "video_id": fake_video_id,
+            "url": yt_url,
+            "privacy": "unlisted",
             "youtube_unlisted_url": yt_url,
             "status": "unlisted",
             "note": "[SAMPLE] Phase-4 플레이스홀더 — 실제 업로드 아님",
@@ -597,7 +696,7 @@ def seed_sample_run(
                VALUES (?, '업로드', 'done', 1, ?, ?, ?, ?)""",
             (
                 run_id,
-                json.dumps({"selected_path": selected_cand["path"]}),
+                json.dumps({"video_path": str(video_path)}),
                 json.dumps(upload_output),
                 t_step_start, t,
             ),
@@ -606,12 +705,13 @@ def seed_sample_run(
         store.add_artifact(
             run_id, "업로드", "youtube_unlisted", yt_url,
             hashlib.sha256(yt_url.encode()).hexdigest(),
-            meta={"status": "unlisted", "sample": True},
+            meta={"status": "unlisted", "sample": True, "video_id": fake_video_id},
         )
         _trace.emit({
             "event": "upload_done",
             "run_id": run_id,
             "youtube_url": yt_url,
+            "video_id": fake_video_id,
             "ts": t,
         }, trace_path=trace_path)
 
@@ -801,6 +901,17 @@ _RUN_TEMPLATE = """\
   .tl-status-done { color: #4ade80; font-size: 12px; }
   .tl-status-failed { color: #f87171; font-size: 12px; }
   .tl-meta { color: #71717a; font-size: 11px; margin-top: 4px; }
+  .tl-metric {
+    display: inline-block;
+    background: #1e1b4b;
+    color: #c4b5fd;
+    border: 1px solid #3730a3;
+    padding: 2px 9px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    margin-top: 6px;
+  }
 
   details { margin-top: 8px; }
   summary { cursor: pointer; color: #818cf8; font-size: 12px; user-select: none; }
@@ -911,6 +1022,9 @@ _RUN_TEMPLATE = """\
         시작: {{ step.started_at_str }} &nbsp;|&nbsp; 완료: {{ step.ended_at_str }}
         &nbsp;|&nbsp; 소요: {{ step.duration_str }}
       </div>
+      {% if step.metric_chip %}
+      <div><span class="tl-metric">{{ step.metric_chip }}</span></div>
+      {% endif %}
       <details>
         <summary>입력 보기</summary>
         <div class="json-block">{{ step.input_pretty }}</div>
@@ -1055,6 +1169,47 @@ def _fmt_duration(started: float | None, ended: float | None) -> str:
     if secs < 60:
         return f"{secs:.1f}s"
     return f"{secs / 60:.1f}분"
+
+
+def _step_metric_chip(step_name: str, output_json: str | None) -> str:
+    """Phase-4 노드(후처리/영상/업로드)의 output_json에서 요약 메트릭 칩 문자열을 만든다.
+
+    해당 없는 스텝이거나 파싱 실패 시 빈 문자열을 반환한다.
+    """
+    if not output_json:
+        return ""
+    try:
+        out = json.loads(output_json)
+    except Exception:
+        return ""
+    if not isinstance(out, dict):
+        return ""
+
+    if step_name == "후처리":
+        measured = out.get("measured_lufs")
+        target = out.get("lufs_target")
+        if measured is None:
+            return ""
+        return f"LUFS {measured} (목표 {target})"
+
+    if step_name == "영상":
+        dur = out.get("duration_sec")
+        if dur is None:
+            return ""
+        try:
+            total = int(round(float(dur)))
+            mm, ss = divmod(total, 60)
+            return f"길이 {mm}:{ss:02d}"
+        except Exception:
+            return ""
+
+    if step_name == "업로드":
+        url = out.get("url")
+        if not url:
+            return ""
+        return f"unlisted: {url}"
+
+    return ""
 
 
 def _safe_json_pretty(json_str: str | None) -> str:
@@ -1220,6 +1375,7 @@ def render(store: Store, trace_path: str, out_dir: str | Path) -> None:
                 "duration_str": _fmt_duration(s["started_at"], s["ended_at"]),
                 "input_pretty": _safe_json_pretty(s["input_json"]),
                 "output_pretty": _safe_json_pretty(s["output_json"]),
+                "metric_chip": _step_metric_chip(s["step_name"], s["output_json"]),
             })
 
         # artifact 목록
