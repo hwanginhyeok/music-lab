@@ -13,17 +13,17 @@ hard trap, aggressive 808, shouting, EDM, distorted synth, female vocal, upbeat 
 ## 섹션별 보컬 디렉션 (persona Suno 영문 태그)
 | 섹션 | 담당 | Suno 보컬 묘사 |
 |------|------|----------------|
-| Intro | Seonghyeon | soft main male vocal over Rhodes, hushed, intimate |
-| Verse 1 | Juhoon | emotive clear tender mid male vocal, heartfelt confession |
-| Pre-Chorus | Juhoon | tender male vocal, fragile honest build |
-| Chorus | Seonghyeon (+Juhoon) | dynamic main male vocal, melodic hook builds to gentle belt, soft backing |
-| Verse 2 | Seonghyeon | soft-spoken main male vocal with sharp emotional edge |
-| Bridge | Juhoon + Seonghyeon | tender emotive duet, emotional peak |
-| Rap Break | Martin | soft restrained sing-rap, no hard beat, vulnerable mid-low male |
-| Final Chorus | Seonghyeon + Juhoon | melodic belt hook, warm duet |
-| Outro | Seonghyeon+Juhoon | soft layered ad-libs over fading Rhodes |
+| Intro | 메인보컬 | soft main male vocal over Rhodes, hushed, intimate |
+| Verse 1 | 감성보컬 | emotive clear tender mid male vocal, heartfelt confession |
+| Pre-Chorus | 감성보컬 | tender male vocal, fragile honest build |
+| Chorus | 메인보컬 (+감성보컬) | dynamic main male vocal, melodic hook builds to gentle belt, soft backing |
+| Verse 2 | 메인보컬 | soft-spoken main male vocal with sharp emotional edge |
+| Bridge | 감성보컬 + 메인보컬 | tender emotive duet, emotional peak |
+| Rap Break | 리더랩 | soft restrained sing-rap, no hard beat, vulnerable mid-low male |
+| Final Chorus | 메인보컬 + 감성보컬 | melodic belt hook, warm duet |
+| Outro | 메인보컬+감성보컬 | soft layered ad-libs over fading Rhodes |
 
-> ⚠️ 04는 Keonho/James 랩 파트 의도적 비움 (보컬 라인 중심 곡).
+> ⚠️ 04는 스웩랩/정밀랩 랩 파트 의도적 비움 (보컬 라인 중심 곡).
 
 ## Suno 입력용 가사 (섹션 마커 포함)
 ```

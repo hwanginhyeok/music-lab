@@ -13,16 +13,16 @@ heavy EDM, orchestral strings, female lead, autotune-heavy, soft lo-fi, ballad
 ## 섹션별 보컬 디렉션 (persona Suno 영문 태그)
 | 섹션 | 담당 | Suno 보컬 묘사 |
 |------|------|----------------|
-| Intro | Martin | confident thick mid-low male sing-rap over guitar riff, swagger |
-| Verse 1 | James | cool precise mid male rap, crisp articulation, multilingual code-switch |
-| Pre-Chorus | Juhoon | emotive clear tender mid male vocal, steady build |
-| Chorus | Seonghyeon (+전원) | soft yet dynamic main male vocal, ultra-catchy melodic hook, group backing |
-| Verse 2 | Martin | confident thick mid-low male sing-rap, punchy bilingual flow |
+| Intro | 리더랩 | confident thick mid-low male sing-rap over guitar riff, swagger |
+| Verse 1 | 정밀랩 | cool precise mid male rap, crisp articulation, multilingual code-switch |
+| Pre-Chorus | 감성보컬 | emotive clear tender mid male vocal, steady build |
+| Chorus | 메인보컬 (+전원) | soft yet dynamic main male vocal, ultra-catchy melodic hook, group backing |
+| Verse 2 | 리더랩 | confident thick mid-low male sing-rap, punchy bilingual flow |
 | Post-Chorus | 전원 | full-crew gang-vocal chant, call-and-response |
-| Bridge | Juhoon + Seonghyeon | tender emotive duet, intimate-to-resolute |
-| Rap Break | Keonho→James | magnetic young male rap with name-drop bravado → cool precise multilingual rap |
-| Final Chorus | Seonghyeon + 전원 | powerful belt hook + full-crew unison |
-| Outro | Seonghyeon+Juhoon | melodic ad-libs over fading 60s guitar |
+| Bridge | 감성보컬 + 메인보컬 | tender emotive duet, intimate-to-resolute |
+| Rap Break | 스웩랩→정밀랩 | magnetic young male rap with name-drop bravado → cool precise multilingual rap |
+| Final Chorus | 메인보컬 + 전원 | powerful belt hook + full-crew unison |
+| Outro | 메인보컬+감성보컬 | melodic ad-libs over fading 60s guitar |
 
 ## Suno 입력용 가사 (섹션 마커 포함)
 ```

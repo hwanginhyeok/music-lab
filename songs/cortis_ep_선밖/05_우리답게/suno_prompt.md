@@ -14,15 +14,15 @@ sad ballad, heavy EDM, female lead, dark trap, mumble, over-polished
 | 섹션 | 담당 | Suno 보컬 묘사 |
 |------|------|----------------|
 | Intro | 전원 | full-crew gang-vocal shout, hype call-and-response |
-| Verse 1 | Keonho | magnetic self-assured young male rap-vocal, swagger, playful |
-| Verse 2 | James | cool precise mid male rap, crisp multilingual code-switch, warm |
-| Pre-Chorus | Juhoon | emotive clear tender mid male vocal, heartfelt build |
-| Chorus | Seonghyeon (+전원) | ultra-catchy melodic hook lead + full-crew unison |
+| Verse 1 | 스웩랩 | magnetic self-assured young male rap-vocal, swagger, playful |
+| Verse 2 | 정밀랩 | cool precise mid male rap, crisp multilingual code-switch, warm |
+| Pre-Chorus | 감성보컬 | emotive clear tender mid male vocal, heartfelt build |
+| Chorus | 메인보컬 (+전원) | ultra-catchy melodic hook lead + full-crew unison |
 | Post-Chorus | 전원 | maximal gang-vocal call-and-response chant |
-| Rap Break | Martin→Keonho | confident thick mid-low sing-rap → magnetic young rap, name bravado |
-| Bridge | Juhoon + Seonghyeon | tender emotive duet, nostalgic |
-| Final Chorus | Seonghyeon + 전원 | powerful belt hook + full-crew unison |
-| Outro | 전원 → Seonghyeon solo | gang vocal fades to a single soft solo male vocal, near-silence close |
+| Rap Break | 리더랩→스웩랩 | confident thick mid-low sing-rap → magnetic young rap, name bravado |
+| Bridge | 감성보컬 + 메인보컬 | tender emotive duet, nostalgic |
+| Final Chorus | 메인보컬 + 전원 | powerful belt hook + full-crew unison |
+| Outro | 전원 → 메인보컬 solo | gang vocal fades to a single soft solo male vocal, near-silence close |
 
 ## Suno 입력용 가사 (섹션 마커 포함)
 ```

@@ -2,12 +2,12 @@
 
 > 섹션별 담당 멤버 표기 (03 voice persona 템플릿, 감정 곡 변형) · 한·영 코드스위칭, 감정상 한국어 비중↑
 
-[Intro — Seonghyeon]
+[Intro — 메인보컬]
 (soft Rhodes) Mmm...
 불 다 끄고 나면
 보이는 게 있어
 
-[Verse 1 — Juhoon]
+[Verse 1 — 감성보컬]
 무대 위 그 자신감
 집에 오면 어디 갔지
 거울 앞에 선 나는
@@ -17,13 +17,13 @@
 This mask is heavy
 가끔 벗고 싶어, just for tonight
 
-[Pre-Chorus — Juhoon]
+[Pre-Chorus — 감성보컬]
 괜찮은 척 안 할게
 오늘만은 솔직히
 무섭다고 말할게
 흔들리는 이 손 그대로
 
-[Chorus — Seonghyeon (+Juhoon 배킹)]
+[Chorus — 메인보컬 (+감성보컬 배킹)]
 흔들려도, even when I shake
 넘어져도, 다시 일어날래
 완벽하지 않아 it's okay
@@ -33,7 +33,7 @@ This mask is heavy
 난 여기 있어, still here
 흔들려도 괜찮아
 
-[Verse 2 — Seonghyeon]
+[Verse 2 — 메인보컬]
 센 척이 제일 쉬웠어
 약한 걸 보이는 게 더 무서웠지
 근데 숨길수록 더 흔들려
@@ -43,13 +43,13 @@ This mask is heavy
 난 자주 무너졌어
 근데 그게 날 더 단단하게 해
 
-[Bridge — Juhoon + Seonghyeon]
-(Juhoon) 흔들리는 건 약한 게 아니야
-(Seonghyeon) 뿌리 깊은 나무도 바람엔 흔들려
+[Bridge — 감성보컬 + 메인보컬]
+(감성보컬) 흔들리는 건 약한 게 아니야
+(메인보컬) 뿌리 깊은 나무도 바람엔 흔들려
 (둘) 부러지지만 않으면 돼
 이 밤이 지나면 또 자랄 테니까
 
-[Rap Break (soft) — Martin]
+[Rap Break (soft) — 리더랩]
 센 비트 없이도 말할 수 있어
 나도 사람이야, 가끔은 작아져
 근데 그게 끝이 아닌 걸 알아
@@ -59,7 +59,7 @@ This mask is heavy
 오늘은 좀 흔들릴게
 내일은 또 단단해질 테니까
 
-[Final Chorus — Seonghyeon lead + Juhoon]
+[Final Chorus — 메인보컬 lead + 감성보컬]
 흔들려도, even when I shake
 넘어져도, 다시 일어날래
 완벽하지 않아 it's okay
@@ -69,7 +69,7 @@ This mask is heavy
 난 여기 있어, still here
 흔들려도 괜찮아
 
-[Outro — Seonghyeon + Juhoon]
+[Outro — 메인보컬 + 감성보컬]
 (Rhodes fade) 흔들려도...
 괜찮아, 괜찮아
 내일 다시 만나
