@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -23,6 +24,62 @@ from typing import Any
 
 from autopilot import trace as _trace
 from autopilot.store import Store
+
+
+# ---------------------------------------------------------------------------
+# 미디어 생성 헬퍼 (TASK A)
+# ---------------------------------------------------------------------------
+
+def _ffmpeg_available() -> bool:
+    """ffmpeg 실행 가능 여부를 확인한다."""
+    ffmpeg_path = "/usr/bin/ffmpeg"
+    return Path(ffmpeg_path).exists()
+
+
+def _gen_tone(out_path: Path, freq: int) -> bool:
+    """5초 사인톤 모노 mp3를 생성한다. 성공 시 True 반환."""
+    try:
+        result = subprocess.run(
+            [
+                "/usr/bin/ffmpeg", "-y",
+                "-f", "lavfi",
+                "-i", f"sine=frequency={freq}:duration=5",
+                "-ac", "1",
+                "-ar", "22050",
+                "-b:a", "96k",
+                str(out_path),
+            ],
+            stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            timeout=30,
+        )
+        return result.returncode == 0 and out_path.exists()
+    except Exception:
+        return False
+
+
+def _gen_video(out_path: Path, audio_path: Path) -> bool:
+    """5초 320x240 컬러 배경 + 오디오 → mp4를 생성한다. 성공 시 True 반환."""
+    try:
+        result = subprocess.run(
+            [
+                "/usr/bin/ffmpeg", "-y",
+                "-f", "lavfi",
+                "-i", "color=c=0x1e1b4b:s=320x240:d=5",
+                "-i", str(audio_path),
+                "-shortest",
+                "-c:v", "libx264",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac",
+                str(out_path),
+            ],
+            stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            timeout=60,
+        )
+        return result.returncode == 0 and out_path.exists()
+    except Exception:
+        return False
 
 # ---------------------------------------------------------------------------
 # 경로 상수
@@ -466,25 +523,49 @@ def seed_sample_run(
         t += 300  # 5분 소요
 
         candidates_out: list[dict] = []
+        # 후보별 주파수 (인덱스에 따라 다르게)
+        _CANDIDATE_FREQS = [330, 440, 550]
+        _use_ffmpeg = _ffmpeg_available()
         for cand_idx, metrics in enumerate(candidate_metrics):
-            # 플레이스홀더 오디오 파일 (실제 오디오 없음 — SAMPLE)
-            placeholder_path = run_dir / f"candidate_{cand_idx:02d}.mp3.txt"
-            placeholder_content = (
-                f"[SAMPLE PLACEHOLDER — 실제 오디오 없음]\n"
-                f"곡: {song['title']}\n"
-                f"후보 인덱스: {cand_idx}\n"
-                f"예상 LUFS: {metrics.get('lufs', 'N/A')}\n"
-                f"예상 길이: {metrics.get('duration_sec', 'N/A')}s\n"
-            )
-            placeholder_path.write_text(placeholder_content, encoding="utf-8")
-            cand_sha = hashlib.sha256(placeholder_content.encode()).hexdigest()
+            if _use_ffmpeg:
+                # 실제 5초 사인톤 mp3 생성
+                cand_path = run_dir / f"candidate_{cand_idx:02d}.mp3"
+                freq = _CANDIDATE_FREQS[cand_idx % len(_CANDIDATE_FREQS)]
+                ok = _gen_tone(cand_path, freq)
+                if ok:
+                    cand_bytes = cand_path.read_bytes()
+                    cand_sha = hashlib.sha256(cand_bytes).hexdigest()
+                else:
+                    # ffmpeg 실패 시 텍스트 플레이스홀더로 폴백
+                    cand_path = run_dir / f"candidate_{cand_idx:02d}.mp3.txt"
+                    placeholder_content = (
+                        f"[SAMPLE PLACEHOLDER — ffmpeg 생성 실패]\n"
+                        f"곡: {song['title']}\n"
+                        f"후보 인덱스: {cand_idx}\n"
+                        f"예상 LUFS: {metrics.get('lufs', 'N/A')}\n"
+                        f"예상 길이: {metrics.get('duration_sec', 'N/A')}s\n"
+                    )
+                    cand_path.write_text(placeholder_content, encoding="utf-8")
+                    cand_sha = hashlib.sha256(placeholder_content.encode()).hexdigest()
+            else:
+                # ffmpeg 없음 — 텍스트 플레이스홀더
+                cand_path = run_dir / f"candidate_{cand_idx:02d}.mp3.txt"
+                placeholder_content = (
+                    f"[SAMPLE PLACEHOLDER — 실제 오디오 없음]\n"
+                    f"곡: {song['title']}\n"
+                    f"후보 인덱스: {cand_idx}\n"
+                    f"예상 LUFS: {metrics.get('lufs', 'N/A')}\n"
+                    f"예상 길이: {metrics.get('duration_sec', 'N/A')}s\n"
+                )
+                cand_path.write_text(placeholder_content, encoding="utf-8")
+                cand_sha = hashlib.sha256(placeholder_content.encode()).hexdigest()
 
             cand_url = f"https://suno.com/song/SAMPLE_{run_id}_{cand_idx:02d}"
             store.add_artifact(
-                run_id, "생성", "audio_candidate", str(placeholder_path), cand_sha,
+                run_id, "생성", "audio_candidate", str(cand_path), cand_sha,
                 meta={"url": cand_url, "index": cand_idx},
             )
-            candidates_out.append({"path": str(placeholder_path), "sha256": cand_sha})
+            candidates_out.append({"path": str(cand_path), "sha256": cand_sha})
 
         store.conn.execute(
             """INSERT INTO steps (run_id, step_name, status, attempt, input_json, output_json, started_at, ended_at)
@@ -589,16 +670,27 @@ def seed_sample_run(
 
         # 선택된 테이크의 측정 LUFS (마스터링 후 -14 근처로 수렴)
         selected_measured_lufs = -14.1
-        mastered_path = run_dir / "mastered.wav"
-        mastered_content = (
-            f"[SAMPLE PLACEHOLDER — 실제 오디오 없음]\n"
-            f"곡: {song['title']}\n"
-            f"마스터링 결과 (Matchering + -14 LUFS 라우드니스 정규화)\n"
-            f"원본 후보: {selected_cand['path']}\n"
-            f"목표 LUFS: -14 / 측정 LUFS: {selected_measured_lufs}\n"
-        )
-        mastered_path.write_text(mastered_content, encoding="utf-8")
-        mastered_sha = hashlib.sha256(mastered_content.encode()).hexdigest()
+        # mastered: 실제 재생 가능한 mp3로 생성 (브라우저 호환 우선)
+        mastered_path = run_dir / "mastered.mp3"
+        _mastered_ok = False
+        if _use_ffmpeg:
+            # 선택된 후보 기반 주파수로 마스터 톤 생성 (약간 다른 주파수)
+            _mastered_freq = _CANDIDATE_FREQS[_SELECTED_TAKE_IDX[song_idx] % len(_CANDIDATE_FREQS)]
+            _mastered_ok = _gen_tone(mastered_path, _mastered_freq)
+        if not _mastered_ok:
+            # 폴백: 텍스트 플레이스홀더
+            mastered_path = run_dir / "mastered.wav"
+            mastered_content = (
+                f"[SAMPLE PLACEHOLDER — 실제 오디오 없음]\n"
+                f"곡: {song['title']}\n"
+                f"마스터링 결과 (Matchering + -14 LUFS 라우드니스 정규화)\n"
+                f"원본 후보: {selected_cand['path']}\n"
+                f"목표 LUFS: -14 / 측정 LUFS: {selected_measured_lufs}\n"
+            )
+            mastered_path.write_text(mastered_content, encoding="utf-8")
+            mastered_sha = hashlib.sha256(mastered_content.encode()).hexdigest()
+        else:
+            mastered_sha = hashlib.sha256(mastered_path.read_bytes()).hexdigest()
 
         postprocess_output = {
             "path": str(mastered_path),
@@ -638,15 +730,21 @@ def seed_sample_run(
         # 선택 테이크 길이를 영상 길이로 사용
         selected_duration = selected_cand.get("metrics", {}).get("duration_sec", 0.0)
         video_path = run_dir / "video.mp4"
-        video_content = (
-            f"[SAMPLE PLACEHOLDER — 실제 영상 없음]\n"
-            f"곡: {song['title']}\n"
-            f"커버 이미지 + 마스터 오디오 → MP4\n"
-            f"오디오: {mastered_path}\n"
-            f"길이: {selected_duration}s\n"
-        )
-        video_path.write_text(video_content, encoding="utf-8")
-        video_sha = hashlib.sha256(video_content.encode()).hexdigest()
+        _video_ok = False
+        if _use_ffmpeg and _mastered_ok:
+            _video_ok = _gen_video(video_path, mastered_path)
+        if not _video_ok:
+            video_content = (
+                f"[SAMPLE PLACEHOLDER — 실제 영상 없음]\n"
+                f"곡: {song['title']}\n"
+                f"커버 이미지 + 마스터 오디오 → MP4\n"
+                f"오디오: {mastered_path}\n"
+                f"길이: {selected_duration}s\n"
+            )
+            video_path.write_text(video_content, encoding="utf-8")
+            video_sha = hashlib.sha256(video_content.encode()).hexdigest()
+        else:
+            video_sha = hashlib.sha256(video_path.read_bytes()).hexdigest()
 
         video_output = {
             "path": str(video_path),
@@ -971,6 +1069,43 @@ _RUN_TEMPLATE = """\
   }
   .audio-placeholder .audio-label { color: #a1a1aa; font-weight: 600; margin-bottom: 4px; }
 
+  /* 인라인 미디어 플레이어 */
+  .take-preview-section { margin-top: 16px; }
+  .take-preview-title {
+    font-size: 12px; font-weight: 700; color: #71717a;
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+  .take-item { margin-bottom: 10px; }
+  .take-label {
+    font-size: 11px; color: #a1a1aa; font-family: monospace; margin-bottom: 3px;
+  }
+  .take-item.selected .take-label { color: #c4b5fd; font-weight: 700; }
+  .take-item.selected audio { border: 1px solid #7c3aed; border-radius: 4px; }
+  audio { width: 100%; max-width: 520px; display: block; }
+  video { display: block; border-radius: 6px; }
+  .placeholder-note {
+    color: #3f3f46; font-size: 11px; font-style: italic; margin-top: 4px;
+  }
+  /* 마스터 / 최종영상 블록 */
+  .master-block { margin-top: 16px; }
+  .master-label {
+    font-size: 12px; font-weight: 700; color: #71717a;
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+  }
+
+  /* trace details */
+  details.trace-details { margin-top: 0; }
+  details.trace-details summary {
+    cursor: pointer; color: #818cf8; font-size: 12px; user-select: none; padding: 4px 0;
+  }
+  details.trace-details summary:hover { color: #a78bfa; }
+
+  /* content-block 가독성 개선 */
+  pre.content-block {
+    line-height: 1.8;
+    color: #c4b5fd;
+  }
+
   /* youtube link */
   .yt-link {
     display: inline-block;
@@ -1091,17 +1226,61 @@ _RUN_TEMPLATE = """\
     </tbody>
   </table>
 
-  <!-- 오디오 플레이스홀더 -->
-  {% if selected_audio_path %}
-  <div style="margin-top:14px;">
-    <div class="audio-label" style="color:#a1a1aa;font-weight:600;margin-bottom:6px;">선택 테이크 (SAMPLE 플레이스홀더)</div>
-    <div class="audio-placeholder">
-      <div class="audio-label">🎵 {{ selected_audio_filename }}</div>
-      <div>[SAMPLE] 실제 오디오 파일 없음 — Phase-4 구현 시 &lt;audio&gt; 태그 활성화</div>
-      <div style="margin-top:6px;font-size:10px;color:#3f3f46;">경로: {{ selected_audio_path }}</div>
-    </div>
+  <!-- 테이크 미리듣기 -->
+  {% set audio_cands = candidates | selectattr("media_kind", "equalto", "audio") | list %}
+  {% if audio_cands or candidates %}
+  <div class="take-preview-section">
+    <div class="take-preview-title">테이크 미리듣기</div>
+    {% for cand in candidates %}
+      {% if cand.media_kind == "audio" %}
+      <div class="take-item {% if cand.is_selected %}selected{% endif %}">
+        <div class="take-label">
+          {{ cand.media_filename }}
+          {% if cand.is_selected %} ★ 선택됨{% endif %}
+          {% if cand.is_rejected %} ✗ 탈락{% endif %}
+        </div>
+        <audio controls preload="none" src="{{ cand.media_src }}"></audio>
+      </div>
+      {% elif cand.media_kind == "" %}
+      <div class="take-item">
+        <div class="take-label">{{ cand.filename }}</div>
+        <span class="placeholder-note">(샘플 플레이스홀더 — 실제 오디오 없음)</span>
+      </div>
+      {% endif %}
+    {% endfor %}
   </div>
   {% endif %}
+
+  <!-- 마스터 음원 / 최종 영상 -->
+  <div class="master-block">
+    {% if mastered_media_kind == "audio" %}
+    <div class="master-label">마스터 음원</div>
+    <audio controls preload="none" src="{{ mastered_media_src }}"></audio>
+    {% elif mastered_media_kind == "video" %}
+    <div class="master-label">마스터 음원</div>
+    <video controls width="320" preload="none" src="{{ mastered_media_src }}"></video>
+    {% else %}
+    <div class="audio-placeholder" style="margin-top:10px;">
+      <div class="audio-label">마스터 음원</div>
+      <div>[SAMPLE] 실제 오디오 파일 없음 — Phase-4 구현 시 &lt;audio&gt; 태그 활성화</div>
+      {% if selected_audio_path %}
+      <div style="margin-top:4px;font-size:10px;color:#3f3f46;">경로: {{ selected_audio_path }}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if video_media_kind == "video" %}
+    <div class="master-label" style="margin-top:12px;">최종 영상</div>
+    <video controls width="320" preload="none" src="{{ video_media_src }}"></video>
+    {% elif video_media_kind == "audio" %}
+    <div class="master-label" style="margin-top:12px;">최종 영상 (오디오)</div>
+    <audio controls preload="none" src="{{ video_media_src }}"></audio>
+    {% else %}
+    <div class="audio-placeholder" style="margin-top:10px;">
+      <div class="audio-label">최종 영상</div>
+      <div>[SAMPLE] 실제 영상 파일 없음 — Phase-4 구현 시 &lt;video&gt; 태그 활성화</div>
+    </div>
+    {% endif %}
+  </div>
 </div>
 {% endif %}
 
@@ -1127,24 +1306,27 @@ _RUN_TEMPLATE = """\
 </div>
 {% endif %}
 
-<!-- 이벤트 타임라인 (trace.jsonl) -->
+<!-- 이벤트 타임라인 (trace.jsonl) — 기본 접힘 -->
 {% if trace_events %}
 <div class="section">
   <div class="section-title">이벤트 타임라인 (sample_trace.jsonl)</div>
-  <table>
-    <thead>
-      <tr><th>시각</th><th>이벤트</th><th>상세</th></tr>
-    </thead>
-    <tbody>
-    {% for ev in trace_events %}
-      <tr>
-        <td style="font-family:monospace;font-size:11px;white-space:nowrap;">{{ ev.ts_str }}</td>
-        <td><code style="color:#c4b5fd;">{{ ev.event }}</code></td>
-        <td style="font-family:monospace;font-size:10px;color:#71717a;word-break:break-all;">{{ ev.detail }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <details class="trace-details">
+    <summary>원시 trace 보기 ({{ trace_events|length }}개 이벤트)</summary>
+    <table style="margin-top:8px;">
+      <thead>
+        <tr><th>시각</th><th>이벤트</th><th>상세</th></tr>
+      </thead>
+      <tbody>
+      {% for ev in trace_events %}
+        <tr>
+          <td style="font-family:monospace;font-size:11px;white-space:nowrap;">{{ ev.ts_str }}</td>
+          <td><code style="color:#c4b5fd;">{{ ev.event }}</code></td>
+          <td style="font-family:monospace;font-size:10px;color:#71717a;word-break:break-all;">{{ ev.detail }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
 </div>
 {% endif %}
 
@@ -1209,6 +1391,25 @@ def _step_metric_chip(step_name: str, output_json: str | None) -> str:
             return ""
         return f"unlisted: {url}"
 
+    return ""
+
+
+def _media_kind(path_str: str | None) -> str:
+    """파일 확장자로 미디어 kind를 판별한다.
+
+    반환값: "audio" / "video" / "" (플레이스홀더)
+    실제 파일이 존재해야 audio/video로 판정한다.
+    """
+    if not path_str:
+        return ""
+    p = Path(path_str)
+    if not p.exists():
+        return ""
+    ext = p.suffix.lower()
+    if ext in {".mp3", ".wav", ".ogg", ".m4a", ".flac"}:
+        return "audio"
+    if ext in {".mp4", ".webm", ".mov"}:
+        return "video"
     return ""
 
 
@@ -1359,6 +1560,26 @@ def render(store: Store, trace_path: str, out_dir: str | Path) -> None:
         run_out = out_dir / run_id
         run_out.mkdir(parents=True, exist_ok=True)
 
+        # _media 심볼릭 링크 생성 (run 아티팩트 디렉토리 → _media)
+        _media_link = run_out / "_media"
+        try:
+            # 아티팩트 디렉토리 결정: artifacts에서 첫 번째 파일의 dirname, 폴백은 data_dir/run_id
+            _art_rows = store.conn.execute(
+                "SELECT path FROM artifacts WHERE run_id = ? LIMIT 10", (run_id,)
+            ).fetchall()
+            _media_target: Path | None = None
+            for _ar in _art_rows:
+                _ap = Path(_ar["path"])
+                if _ap.exists():
+                    _media_target = _ap.parent.resolve()
+                    break
+            if _media_target is None:
+                _env_data = os.environ.get("AUTOPILOT_DATA_DIR", "data/autopilot")
+                _media_target = (Path(_env_data) / run_id).resolve()
+            os.symlink(_media_target, _media_link)
+        except Exception:
+            pass  # 이미 존재하거나 실패해도 무시
+
         # 스텝 목록
         steps_rows = store.conn.execute(
             "SELECT * FROM steps WHERE run_id = ? ORDER BY started_at",
@@ -1433,9 +1654,11 @@ def render(store: Store, trace_path: str, out_dir: str | Path) -> None:
             is_rejected = cpath in pf_rejected
             is_selected = (selected_path is not None and cpath == selected_path)
             metrics = pf_metrics.get(cpath, {})
+            _basename = Path(cpath).name
+            _kind = _media_kind(cpath)
 
             candidates_data.append({
-                "filename": Path(cpath).name,
+                "filename": _basename,
                 "full_path": cpath,
                 "lufs": f"{metrics.get('lufs', '—'):.1f}" if isinstance(metrics.get("lufs"), float) else "—",
                 "peak_dbfs": f"{metrics.get('peak_dbfs', '—'):.2f}" if isinstance(metrics.get("peak_dbfs"), float) else "—",
@@ -1443,17 +1666,45 @@ def render(store: Store, trace_path: str, out_dir: str | Path) -> None:
                 "is_rejected": is_rejected,
                 "is_selected": is_selected,
                 "reject_reason": pf_rejected.get(cpath, ""),
+                # 미디어 서빙 정보
+                "media_filename": _basename,
+                "media_src": "_media/" + _basename,
+                "media_kind": _kind,
             })
 
         # 선택된 오디오 경로
         selected_audio_path = selected_path
         selected_audio_filename = Path(selected_path).name if selected_path else None
+        # 선택 테이크 미디어 정보
+        selected_media_kind = _media_kind(selected_path) if selected_path else ""
+        selected_media_src = ("_media/" + Path(selected_path).name) if selected_path else ""
 
         # YouTube URL
         upload_step = store.get_step(run_id, "업로드")
         if upload_step and upload_step["output_json"]:
             up_out = json.loads(upload_step["output_json"])
             youtube_url = up_out.get("youtube_unlisted_url")
+
+        # 마스터 오디오(후처리) + 최종 영상 미디어 정보
+        postprocess_step = store.get_step(run_id, "후처리")
+        mastered_media_src: str = ""
+        mastered_media_kind: str = ""
+        if postprocess_step and postprocess_step["output_json"]:
+            _pp_out = json.loads(postprocess_step["output_json"])
+            _mpath = _pp_out.get("path", "")
+            mastered_media_kind = _media_kind(_mpath)
+            if mastered_media_kind:
+                mastered_media_src = "_media/" + Path(_mpath).name
+
+        video_step = store.get_step(run_id, "영상")
+        video_media_src: str = ""
+        video_media_kind: str = ""
+        if video_step and video_step["output_json"]:
+            _vs_out = json.loads(video_step["output_json"])
+            _vpath = _vs_out.get("path", "")
+            video_media_kind = _media_kind(_vpath)
+            if video_media_kind:
+                video_media_src = "_media/" + Path(_vpath).name
 
         # trace 이벤트
         raw_events = _load_trace_events(trace_path, run_id)
@@ -1500,6 +1751,12 @@ def render(store: Store, trace_path: str, out_dir: str | Path) -> None:
             candidates=candidates_data,
             selected_audio_path=selected_audio_path,
             selected_audio_filename=selected_audio_filename,
+            selected_media_kind=selected_media_kind,
+            selected_media_src=selected_media_src,
+            mastered_media_src=mastered_media_src,
+            mastered_media_kind=mastered_media_kind,
+            video_media_src=video_media_src,
+            video_media_kind=video_media_kind,
             youtube_url=youtube_url,
             selection=selection_info,
             trace_events=trace_events_data,
