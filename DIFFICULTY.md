@@ -13,6 +13,15 @@
 - **Know-how**: **Suno song generation cannot be automated (as of 2026-03)**. Download/metadata lookup is possible with the Clerk JWT. Generation is done manually on the web + remote access via noVNC.
 - **Related files**: `suno_client.py`, `suno_download.py`, `suno_pipeline.py`
 
+### 2026-06-14 update — PIPE-AUTO real VNC e2e reconfirms the anti-bot wall
+
+While running the full PIPE-AUTO pipeline through `suno_client.SunoClient` (VNC :1 + Chrome), two bugs surfaced and were fixed, but the underlying D-001 wall held:
+
+- **Bug #1 (Create-form hang)**: `driver.get` to the Suno Create page hung until the urllib3 socket read timeout (opaque `ReadTimeoutError on chromedriver, read timeout=120`). Root causes (live-DOM confirmed, test-first): (1) no `page_load`/`script` timeout set → the SPA's late `load` event blocks indefinitely; (2) the lyrics textarea was matched by a stale placeholder heuristic (`'lyric'`) — the live placeholder changed to `'[Verse]This is where you write your rhymes...'` → `lyrics_ta=None` → Create stayed disabled. **Fix**: `set_page_load_timeout(45)` + `set_script_timeout(30)` (fast explicit failure) + anchor on `textarea[data-testid="lyrics-textarea"]` (with placeholder fallback). Commit `127cf2b`.
+- **Bug #2 (captcha eats the submission)**: after clicking Create, an hCaptcha appears; the human solves it via noVNC, the modal closes — **but the generation never enters Suno's queue** (credits 2650→2650 and song count 20→20 unchanged across **3** Create attempts + 3 human captcha solves; the Create button stays enabled, no Workspaces item). **Fix attempt**: a resubmit loop (max 3, confirm via credit-drop OR song-count-rise, re-click on miss) — mechanically correct (it detects the non-submission and re-clicks) but it does **not** break the wall: solving the captcha in an automation context does not carry the generate submission through. Commit (Bug#2 resubmit) + e2e logs.
+- **Conclusion (reaffirms D-001)**: **Suno generation cannot be automated end-to-end** — even with a human solving the captcha, the bot-context generate request is gated. Captcha is an **hCaptcha event-touch** (telegram alert → noVNC manual solve → auto-resume) but does not unblock the queue. **Workaround**: generate via the proven manual/semi-auto path (`suno_pipeline.py` / manual web) → download; run **PIPE-AUTO from the prefilter stage onward** by injecting already-generated real candidates (validated: prefilter → selection gate → postprocess(-14 LUFS) → video → publish_approval gate, 0 credits, 0 captcha). See `scripts/run_pipe_auto_from_candidates.py`.
+- **Related files (added)**: `autopilot/nodes/generate.py`, `autopilot/nodes/prefilter.py`, `scripts/run_pipe_auto_from_candidates.py`
+
 ---
 
 ## D-002: Clerk JWT auth — short session-cookie expiry cycle
@@ -126,3 +135,26 @@
   - Specifying `3 minute song` in Style has negligible effect, but include it anyway
   - Pure instrumental: 5~6 `[Instrumental]` section markers + `instrumental only, no vocals`
 - **Related files**: `songs/17_무색무취의빈병/tracks/*/suno_prompt.md`, `suno_client.py`
+
+---
+
+## D-008: 좀비 bot.py — duplicate getUpdates poller steals Telegram updates + pgrep cmdline collision
+
+- **Date**: 2026-06-14
+- **Situation**: Testing the PIPE-AUTO F02 `/select` inline-button flow live. The user pressed a candidate button in Telegram, but nothing happened — the systemd `music-bot` log showed only `getUpdates` polling, never the command/callback.
+- **Problem**:
+  1. **Duplicate poller stealing updates**: a manual `python3 bot.py` zombie (old code, started earlier from a shell and never killed) was long-polling `getUpdates` on the **same Telegram token** as the systemd bot. Telegram delivers each update to **only one** long-poll consumer → the user's `/select` + button click was handed to the zombie (old code, no F02 handler) and silently vanished.
+  2. **pgrep cmdline collision**: three bots on the host — `music-bot` (`/home/window11/music-lab` `python3 bot.py`), `x-bot` (`/home/window11/x-bot` `python3 bot.py`), `pm-bot` (`bot/pm_bot.py`) — and the first two share the **exact `python3 bot.py` cmdline**. `pgrep -f "python3 bot.py"` therefore matched the wrong processes, AND matched my own diagnostic Bash commands (which contained the string `"python3 bot.py"`) → phantom "spawn loop" + a **mistaken `kill` of x-bot**.
+- **Trial and error**:
+  - Killed PID 365 / 3136718 believing they were music-lab zombies — one was actually **x-bot** (recovered automatically via `Restart=always`, NRestarts climbed).
+  - Saw "transient music-lab `bot.py` every ~1s" → turned out to be `pgrep -f` matching my own running Bash commands (child of my Claude session, cwd music-lab). No real spawn loop existed.
+- **Solution**:
+  - **F14: flock single-instance guard** (`bot.py` `_acquire_single_instance_lock`): `fcntl.flock(LOCK_EX|LOCK_NB)` on `data/.music-bot.lock`, called at the very top of `main()` before any Telegram setup → a duplicate instance logs an error and `SystemExit(1)` **before it ever polls**. flock auto-releases on process death (no stale-pidfile problem). Verified with a real two-subprocess test (`tests/test_bot_single_instance.py`): 2nd instance exits 1; after the 1st dies a 3rd acquires cleanly.
+  - **systemd-only operation** (documented in `CLAUDE.md` / `.claude/rules/workflow.md`): never run manual `python3 bot.py`; operate only via systemd `music-bot`.
+- **Know-how**:
+  1. **One getUpdates poller per token** — a second poller silently steals a *share* of updates (no error, just missing messages). The flock guard is the fix.
+  2. **Zombie origin = manual `python3 bot.py`** (found in shell history). Manual launches that outlive their terminal become duplicate pollers.
+  3. **On multi-bot hosts, never identify a service by `pgrep -f "python3 bot.py"`** — shared cmdlines cause false positives and wrong kills. Filter by **cwd** (`/proc/<pid>/cwd`) or by systemd **cgroup**/MainPID instead.
+  4. flock guard > pidfile (no stale-pid edge cases).
+- **Related files**: `bot.py`, `tests/test_bot_single_instance.py`, `CLAUDE.md`, `.claude/rules/workflow.md`
+- **Related commit**: `a45288d` (F14 guard)
