@@ -17,6 +17,7 @@ Claude Code CLI의 OAuth 인증을 그대로 사용.
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import io
 import json
 import logging
@@ -58,6 +59,39 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger("music-lab")
+
+# ---------------------------------------------------------------------------
+# 단일 인스턴스 잠금 (PIPE-F14)
+# ---------------------------------------------------------------------------
+_INSTANCE_LOCK_FH = None  # 전역 — fd가 GC/close되지 않게 유지 (잠금은 프로세스 생존 동안 유지)
+
+
+def _acquire_single_instance_lock(lock_path: str = None) -> None:
+    """중복 bot.py 인스턴스 방지. 이미 실행 중이면 경고 후 즉시 종료.
+    (같은 텔레그램 토큰 2개가 getUpdates 폴링해 메시지 가로채는 사고 차단 — PIPE-F14)"""
+    global _INSTANCE_LOCK_FH
+    if lock_path is None:
+        lock_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", ".music-bot.lock"
+        )
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+    fh = open(lock_path, "w")
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (BlockingIOError, OSError):
+        logger.error(
+            "이미 실행 중인 music-bot 인스턴스가 있습니다 — 중복 실행 차단, 종료. "
+            "(운영은 systemd music-bot만 사용)"
+        )
+        raise SystemExit(1)
+    _INSTANCE_LOCK_FH = fh  # 잠금 유지
+    try:
+        fh.write(str(os.getpid()))
+        fh.flush()
+    except Exception:
+        pass
+    logger.info("단일 인스턴스 잠금 획득 (%s)", lock_path)
+
 
 SYSTEM_PROMPT = """너는 Music Lab 봇이다. 음악 작곡/작사/이론을 가르치는 AI 뮤직 튜터.
 
@@ -1867,10 +1901,262 @@ async def cmd_oauth_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(f"❌ 상태 확인 실패: {e}")
 
 
+async def cmd_resume(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/resume [run_id] [choice] — 대기 중인 파이프라인 게이트를 재개한다.
+
+    인수 없이 /resume → 대기 중인 게이트 목록 표시.
+    /resume <run_id> <choice> → 해당 run_id의 open gate에 choice 답변 주입 후 재개.
+
+    publish_approval 게이트의 경우 "올려" 또는 "yes"로 승인할 수 있다.
+    """
+    if not await _check_auth(update):
+        return
+
+    # lazy import — autopilot 의존성이 없어도 봇 import 성공 보장
+    try:
+        import autopilot.resume as _resume_mod
+        from autopilot.store import Store as _Store
+    except ImportError as exc:
+        await update.message.reply_text(f"❌ autopilot 모듈 로드 실패: {exc}")
+        return
+
+    # autopilot DB 경로 (프로젝트 루트 기준)
+    import os as _os
+    from pathlib import Path as _Path
+    _ap_db = _os.environ.get(
+        "AUTOPILOT_DB_PATH",
+        str(_Path(__file__).parent / "data" / "autopilot.db"),
+    )
+
+    try:
+        _store = _Store(_ap_db)
+    except Exception as exc:
+        await update.message.reply_text(f"❌ autopilot DB 열기 실패: {exc}")
+        return
+
+    args_text = update.message.text or ""
+    # "/resume" 이후 부분 파싱
+    parts = args_text.split()[1:]  # 첫 토큰(/resume) 제거
+
+    if not parts:
+        # 대기 중인 게이트 목록 표시
+        waiting = _resume_mod.list_awaiting(_store)
+        if not waiting:
+            await update.message.reply_text("대기 중인 파이프라인 게이트가 없습니다.")
+            return
+
+        lines = ["대기 중인 게이트:"]
+        for w in waiting:
+            lines.append(f"  run_id={w['run_id']}  kind={w['kind']}  status={w['status']}")
+        lines.append("\n재개: /resume <run_id> <yes|no|올려>")
+        await update.message.reply_text("\n".join(lines))
+        return
+
+    if len(parts) < 2:
+        await update.message.reply_text(
+            "사용법: /resume <run_id> <yes|올려>  또는  /resume (목록)"
+        )
+        return
+
+    run_id, choice_raw = parts[0], parts[1]
+    choice = choice_raw.strip().lower()
+
+    # run 조회
+    run_row = _store.get_run(run_id)
+    if run_row is None:
+        await update.message.reply_text(f"❌ run_id 없음: {run_id}")
+        return
+
+    status = run_row["status"]
+    if not status.startswith("awaiting_"):
+        await update.message.reply_text(f"이 run은 대기 상태가 아닙니다 (status={status}).")
+        return
+
+    kind = status.removeprefix("awaiting_")
+
+    # publish_approval: "올려" / "yes" → approve_publish 헬퍼 사용
+    if kind == "publish_approval" and choice in ("올려", "yes", "y"):
+        try:
+            from autopilot.gate import approve_publish as _approve
+            _approve(_store, run_id)
+            await update.message.reply_text(
+                f"✅ run {run_id} 게시 승인 완료.\n"
+                "파이프라인은 다음 실행 시 게이트를 통과합니다."
+            )
+        except Exception as exc:
+            logger.error("publish_approval 오류: %s", exc)
+            await update.message.reply_text(f"❌ 승인 실패: {exc}")
+        return
+
+    # 일반 게이트: answer dict 주입 (파이프라인 함수는 봇에서 재구성 불가이므로 answer만 기록)
+    open_task = _store.get_open_human_task(run_id, kind)
+    if open_task is None:
+        await update.message.reply_text(f"kind={kind} 에 대한 open task가 없습니다.")
+        return
+
+    try:
+        import time as _time
+        _store.answer_human_task(open_task["id"], {"choice": choice, "ts": _time.time()})
+        await update.message.reply_text(
+            f"✅ run {run_id} 게이트 '{kind}' 에 답변 등록: {choice!r}\n"
+            "파이프라인 재실행은 별도로 트리거하세요 (/pipeline 등)."
+        )
+    except Exception as exc:
+        logger.error("resume 오류: %s", exc)
+        await update.message.reply_text(f"❌ 재개 실패: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# F02: PIPE-AUTO selection 후보 카드 (/select + 인라인 콜백) — 순수 추가
+# ---------------------------------------------------------------------------
+
+async def cmd_select(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/select [run_id] — awaiting_selection run의 후보 카드를 표시한다.
+
+    인수 없이 /select → awaiting_selection 상태 run 목록 안내.
+    /select <run_id> → 프리필터 통과 후보를 인라인 버튼 카드로 전송.
+    버튼을 누르면 _handle_pipeauto_callback 이 selected_index 를 주입해 재개한다.
+    """
+    if not await _check_auth(update):
+        return
+
+    # lazy import — autopilot 의존성 없이도 봇 import 성공 보장
+    try:
+        import autopilot.resume as _resume_mod
+        from autopilot.cards import build_selection_card as _build_card
+        from autopilot.store import Store as _Store
+    except ImportError as exc:
+        await update.message.reply_text(f"❌ autopilot 모듈 로드 실패: {exc}")
+        return
+
+    import os as _os
+    from pathlib import Path as _Path
+    _ap_db = _os.environ.get(
+        "AUTOPILOT_DB_PATH",
+        str(_Path(__file__).parent / "data" / "autopilot.db"),
+    )
+
+    try:
+        _store = _Store(_ap_db)
+    except Exception as exc:
+        await update.message.reply_text(f"❌ autopilot DB 열기 실패: {exc}")
+        return
+
+    parts = (update.message.text or "").split()[1:]
+
+    if not parts:
+        # awaiting_selection 인 것만 필터링해 안내
+        waiting = [
+            w for w in _resume_mod.list_awaiting(_store)
+            if w["kind"] == "selection"
+        ]
+        if not waiting:
+            await update.message.reply_text("후보 선택 대기 중인 곡이 없습니다.")
+            return
+        lines = ["후보 선택 대기 중인 곡:"]
+        for w in waiting:
+            lines.append(f"  run_id={w['run_id']}")
+        lines.append("\n카드 보기: /select <run_id>")
+        await update.message.reply_text("\n".join(lines))
+        return
+
+    run_id = parts[0]
+    try:
+        card = _build_card(_store, run_id)
+    except Exception as exc:
+        logger.error("select 카드 생성 오류: %s", exc)
+        await update.message.reply_text(f"❌ 카드 생성 실패: {exc}")
+        return
+
+    buttons = [
+        [InlineKeyboardButton(label, callback_data=cb)]
+        for (label, cb) in card["buttons"]
+    ]
+    if buttons:
+        buttons.append([InlineKeyboardButton("❌ 취소", callback_data="pipeauto:cancel")])
+        reply_markup = InlineKeyboardMarkup(buttons)
+    else:
+        reply_markup = None
+
+    await update.message.reply_text(card["text"], reply_markup=reply_markup)
+
+
+async def _handle_pipeauto_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """PIPE-AUTO selection 인라인 콜백 처리 — 후보 선택 → 파이프라인 재개."""
+    query = update.callback_query
+    if not query:
+        return
+    await query.answer()
+
+    if query.data == "pipeauto:cancel":
+        await query.edit_message_text("❌ 취소되었습니다.")
+        return
+
+    # lazy import
+    try:
+        from autopilot.cards import apply_selection as _apply
+        from autopilot.cards import parse_select_callback as _parse
+        from autopilot.store import Store as _Store
+    except ImportError as exc:
+        await query.edit_message_text(f"❌ autopilot 모듈 로드 실패: {exc}")
+        return
+
+    parsed = _parse(query.data or "")
+    if parsed is None:
+        await query.edit_message_text("❌ 잘못된 선택 데이터입니다.")
+        return
+    run_id, idx = parsed
+
+    import os as _os
+    from pathlib import Path as _Path
+    _ap_db = _os.environ.get(
+        "AUTOPILOT_DB_PATH",
+        str(_Path(__file__).parent / "data" / "autopilot.db"),
+    )
+    try:
+        _store = _Store(_ap_db)
+    except Exception as exc:
+        await query.edit_message_text(f"❌ autopilot DB 열기 실패: {exc}")
+        return
+
+    await query.edit_message_text(
+        f"⏳ 후보 {idx + 1} 선택 — 후처리·영상 진행 중..."
+    )
+
+    # resume 내부의 ffmpeg/youtube 는 느릴 수 있으므로 이벤트 루프 밖에서 실행
+    try:
+        result = await asyncio.to_thread(_apply, _store, run_id, idx)
+    except Exception as exc:
+        logger.error("pipeauto apply_selection 오류: %s", exc, exc_info=True)
+        await query.edit_message_text(f"❌ 선택 처리 실패: {exc}")
+        return
+
+    status = result.get("status", "unknown")
+    if status == "awaiting_publish_approval":
+        await query.edit_message_text(
+            f"✅ 후보 {idx + 1} 선택 — 후처리·영상 진행, "
+            "업로드 승인 대기('올려')"
+        )
+    elif status == "done":
+        await query.edit_message_text(f"✅ 후보 {idx + 1} 선택 — 완료(업로드까지 진행됨).")
+    elif status == "noop":
+        reason = result.get("reason", "이미 처리되었거나 대기 상태가 아닙니다.")
+        await query.edit_message_text(f"⚠️ 처리할 수 없습니다: {reason}")
+    elif status == "failed":
+        await query.edit_message_text(
+            f"❌ 후보 {idx + 1} 처리 실패: {result.get('error', '원인 불명')}"
+        )
+    else:
+        await query.edit_message_text(
+            f"후보 {idx + 1} 처리됨 (status={status})."
+        )
+
+
 # ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
 def main() -> None:
+    _acquire_single_instance_lock()  # 중복 폴러 차단 (PIPE-F14) — 텔레그램 setup 전 최우선
     logger.info("Music Lab 봇 시작 (Claude CLI 로컬 모드)")
     if ALLOWED_USERS:
         logger.info("ALLOWED_USERS 화이트리스트 활성: %s", ALLOWED_USERS)
@@ -1904,6 +2190,9 @@ def main() -> None:
     app.add_handler(CommandHandler("youtube_delete", cmd_youtube_delete))
     app.add_handler(CommandHandler("youtube_stats", cmd_youtube_stats))
     app.add_handler(CommandHandler("oauth_status", cmd_oauth_status))
+    app.add_handler(CommandHandler("resume", cmd_resume))
+    app.add_handler(CommandHandler("select", cmd_select))
+    app.add_handler(CallbackQueryHandler(_handle_pipeauto_callback, pattern="^pipeauto:"))
     app.add_handler(CallbackQueryHandler(_handle_suno_callback, pattern="^suno:"))
     app.add_handler(CallbackQueryHandler(_handle_youtube_callback, pattern="^youtube:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

@@ -6,12 +6,11 @@
 |---|--------|----------|---------|------|
 | PIPE-F05 | Fix Drive service account JSON (bug) | P1 | user: GCP issuance | `client_secrets.json` is OAuth format. GCP console `music-lab-491900` → IAM → create service account → key JSON → save to `credentials/drive-sa.json` + update `.env GOOGLE_CREDENTIALS_PATH` |
 | PIPE-F10 | Auto-refresh YouTube OAuth refresh_token | P1 | — | Prevent recurrence of the token expiry hit in 4-1. Telegram warning 7 days before expiry + re-auth link |
-| PIPE-F01 | Automatic quality analysis (quality analyzer) | P1 | — | pyloudnorm + librosa + essentia + Claude multimodal. Outputs score to `quality/{song_id}.json` |
-| PIPE-F02 | Telegram bot /review inline | P1 | PIPE-F01 | 6-song cards + inline buttons (pick/extend/reject/edit). On pick, auto-enters the F-04 queue |
 | 2-1 | Phase 1: Understand chord progressions (1 week) | P1 | — | Suno-linked learning curriculum |
-| 5-12 | Jazz Suite post-processing (loudness normalization) | P1 | 4-1 done | Correct volume deviation across tracks (-14 LUFS) — can reuse the PIPE-F04 lightweight path |
+| 5-12 | Jazz Suite post-processing (loudness normalization) | P1 | 4-1 done | Correct volume deviation across tracks (-14 LUFS) — can reuse the PIPE-F04 lightweight path. **PIPE-AUTO 후처리 노드(`autopilot/nodes/postprocess.py`)로 재사용 가능** |
 | 5-17b | 무색무취의 빈병 — post-processing + YouTube release | P1 | 5-17 selection done | After best-take selection, -14 LUFS post-processing → album video → YouTube publish |
-| PIPE-F11 | Fix suno_pipeline polling v2 missing bug | P1 | — | Suno generates two songs (v1/v2) per generate call, but suno_pipeline.py polling terminates at the moment the first song completes. v2 is currently supplemented after the fact via suno_download.py. Workaround pattern verified in the batch script — a formal fix is needed |
+
+> ✅ PIPE-F12/F01/F02/F11 → FINISHED 이동 (2026-06-13~14, PIPE-AUTO Phase 2~4 + F02 완료)
 
 ## P2
 
@@ -21,7 +20,6 @@
 
 | # | Task | Priority | depends | Notes |
 |---|--------|----------|---------|------|
-| 5-16 | 'Art / Artist' jazz EP — homophone paradox, 9 songs | P2 | — | **On hold (2026-05-05)**. Bill Evans tone Vol.2. Homophone paradox of the object of longing 'Art' (a person's name) + 'artist' (the narrator's self). English lyrics. Concept draft `songs/16_art_artist/concept_draft.md`. Re-evaluate after 5-17 (무색무취) |
 | 2-2 | Phase 2: Writing melodies (1~2 weeks) | P2 | 2-1 done | |
 | 2-3 | Phase 3: Designing song structure (1~2 weeks) | P2 | 2-2 done | |
 | 3-3 | Chord progression visualization (image generation) | P2 | — | |

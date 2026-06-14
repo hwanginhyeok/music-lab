@@ -27,6 +27,9 @@ tonight_prompt_done.txt
 *.deb
 .gstack/
 
+# PIPE-AUTO 저널 출력 (자동 생성, 커밋 불필요)
+runs/
+
 # 레퍼런스 음원 (마스터링용, 배포 아님)
 songs/_reference/
 
