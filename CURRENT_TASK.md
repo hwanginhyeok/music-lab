@@ -6,7 +6,6 @@
 | 5-19 | Daylight Hours post-processing + release | 2026-05-10 | ⏸️ On hold | 15 K-pop tracks. v1.mp3 complete (GDrive). Next: select best take → post-process (-14 LUFS) → publish to YouTube |
 | 5-20 | Electric Feelings post-processing + release | 2026-05-10 | ⏸️ On hold | 15 pop-rock variant tracks. v1.mp3 complete (GDrive). Next: select best take → post-process (-14 LUFS) → publish to YouTube |
 | 7-1 | YouTube posting copy auto-generation pipeline | 2026-04-23 | — | P1. Song meta → Claude API → title/description/hashtags/timestamps. Phase 1 CLI → Phase 2 Telegram /youtube_copy → Phase 3 uploader auto-injection |
-| PIPE-AUTO | 음악 풀자동 파이프라인 — 잔여 통합 | 2026-06-14 | ⏸️ (c) VNC 의존 | **Phase 2~4 + HTML 저널 + 풀 파이프라인 조립 + F02 텔레그램 후보카드/`/select`/`/resume` 라이브 완료(→FINISHED)**. 봇 active 가동 중. ~~(b) 저널 렌더러 Phase 4 노드(후처리/영상/업로드) 표시~~ ✅완료(06-14, `9e97761`). 잔여: **(c)** 실 VNC(:1) e2e 1회 — 기획→생성→선택→후처리→영상→업로드 실런(⏸️ VNC+실생성+캡차 이벤트터치 의존, PM이 환경 준비 후). 설계 SSOT `plans/PIPE-AUTO.md` |
 
 ## 7-1 Detailed Spec
 

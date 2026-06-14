@@ -4,7 +4,7 @@
 
 ## Summary
 
-- Current: 7 (4 blocked)
+- Current: 6 (3 blocked)
 - Prepared: 0 (P0: **0** / P1: **0** / P2: 0 / P3: 0)
 - Finished: 58
 - Last synced: 1781369781
