@@ -1,0 +1,77 @@
+# 흔들려도 (Even When I Shake) — 가사 v1
+
+> 섹션별 담당 멤버 표기 (03 voice persona 템플릿, 감정 곡 변형) · 한·영 코드스위칭, 감정상 한국어 비중↑
+
+[Intro — Seonghyeon]
+(soft Rhodes) Mmm...
+불 다 끄고 나면
+보이는 게 있어
+
+[Verse 1 — Juhoon]
+무대 위 그 자신감
+집에 오면 어디 갔지
+거울 앞에 선 나는
+생각보다 작아 보여
+다 아는 척했지만
+사실 나도 잘 모르겠어
+This mask is heavy
+가끔 벗고 싶어, just for tonight
+
+[Pre-Chorus — Juhoon]
+괜찮은 척 안 할게
+오늘만은 솔직히
+무섭다고 말할게
+흔들리는 이 손 그대로
+
+[Chorus — Seonghyeon (+Juhoon 배킹)]
+흔들려도, even when I shake
+넘어져도, 다시 일어날래
+완벽하지 않아 it's okay
+이 떨림도 나니까, I'll stay
+흔들려도 (shake), 흔들려도 (shake)
+부서질 것 같은 밤에도
+난 여기 있어, still here
+흔들려도 괜찮아
+
+[Verse 2 — Seonghyeon]
+센 척이 제일 쉬웠어
+약한 걸 보이는 게 더 무서웠지
+근데 숨길수록 더 흔들려
+이제 그냥 인정할래, I'm scared
+빛나는 무대 뒤편
+아무도 안 보는 곳에서
+난 자주 무너졌어
+근데 그게 날 더 단단하게 해
+
+[Bridge — Juhoon + Seonghyeon]
+(Juhoon) 흔들리는 건 약한 게 아니야
+(Seonghyeon) 뿌리 깊은 나무도 바람엔 흔들려
+(둘) 부러지지만 않으면 돼
+이 밤이 지나면 또 자랄 테니까
+
+[Rap Break (soft) — Martin]
+센 비트 없이도 말할 수 있어
+나도 사람이야, 가끔은 작아져
+근데 그게 끝이 아닌 걸 알아
+흔들린 만큼 더 깊이 뿌리내려
+어린 게 죄는 아니잖아
+모르는 게 부끄러운 것도 아니야
+오늘은 좀 흔들릴게
+내일은 또 단단해질 테니까
+
+[Final Chorus — Seonghyeon lead + Juhoon]
+흔들려도, even when I shake
+넘어져도, 다시 일어날래
+완벽하지 않아 it's okay
+이 떨림도 나니까, I'll stay
+흔들려도 (shake), 흔들려도 (shake)
+부서질 것 같은 밤에도
+난 여기 있어, still here
+흔들려도 괜찮아
+
+[Outro — Seonghyeon + Juhoon]
+(Rhodes fade) 흔들려도...
+괜찮아, 괜찮아
+내일 다시 만나
+흔들려도, I'll be here
+</content>
