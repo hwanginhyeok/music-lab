@@ -66,7 +66,7 @@ class SunoAPI:
         s.headers["Cookie"] = self.cookie
         s.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
-        resp = s.get(f"{self.CLERK_URL}/v1/client?_clerk_js_version=5.117.0")
+        resp = s.get(f"{self.CLERK_URL}/v1/client?_clerk_js_version=5.117.0", timeout=15)
         data = resp.json()["response"]
         sessions = data.get("sessions", [])
         if not sessions:
@@ -74,7 +74,7 @@ class SunoAPI:
             raise SunoAuthError("Suno 세션 없음 — 쿠키 만료. 브라우저에서 재로그인 필요")
 
         sid = sessions[0]["id"]
-        token_resp = s.post(f"{self.CLERK_URL}/v1/client/sessions/{sid}/tokens?_clerk_js_version=5.117.0")
+        token_resp = s.post(f"{self.CLERK_URL}/v1/client/sessions/{sid}/tokens?_clerk_js_version=5.117.0", timeout=15)
         self._jwt = token_resp.json().get("jwt", "")
         if not self._jwt:
             logger.error("JWT 토큰 갱신 실패")
@@ -95,7 +95,7 @@ class SunoAPI:
     def get_credits(self) -> int:
         """남은 크레딧."""
         self._get_jwt()
-        r = self._session.get(f"{self.BASE_URL}/api/billing/info/")
+        r = self._session.get(f"{self.BASE_URL}/api/billing/info/", timeout=15)
         if r.status_code == 200:
             return r.json().get("total_credits_left", r.json().get("credits", -1))
         return -1
@@ -103,7 +103,7 @@ class SunoAPI:
     def get_songs(self, page: int = 0) -> list[dict]:
         """내 곡 목록."""
         self._get_jwt()
-        r = self._session.get(f"{self.BASE_URL}/api/feed/?page={page}")
+        r = self._session.get(f"{self.BASE_URL}/api/feed/?page={page}", timeout=15)
         if r.status_code != 200:
             print(f"❌ 곡 목록 조회 실패: {r.status_code}")
             return []
@@ -113,7 +113,7 @@ class SunoAPI:
     def get_song(self, song_id: str) -> dict | None:
         """개별 곡 정보."""
         self._get_jwt()
-        r = self._session.get(f"{self.BASE_URL}/api/clip/{song_id}")
+        r = self._session.get(f"{self.BASE_URL}/api/clip/{song_id}", timeout=15)
         if r.status_code == 200:
             return r.json()
         return None
