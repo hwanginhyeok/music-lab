@@ -530,6 +530,7 @@ class SunoClient:
         title: str = "",
         model: str = "v5.5",
         instrumental: bool = False,
+        submit: bool = True,
     ) -> list[str]:
         """곡 생성 → song URL 리스트 반환 (Suno는 2곡 동시 생성).
 
@@ -746,6 +747,12 @@ class SunoClient:
             raise SunoError(f'입력 실패: {e}') from e
 
         time.sleep(1)
+
+        # submit=False: 폼만 채우고 제출 안 함 (D-001 안티봇 수동 클릭 우회 — 형님이 직접 Create)
+        if not submit:
+            logger.info("submit=False — 폼 입력만 완료, Create 미클릭")
+            print("[폼 준비됨] Create 미클릭 (수동 제출 대기)", flush=True)
+            return []
 
         # API로 제출 baseline 수집 (기존 곡 ID + 크레딧).
         # 캡차 우회/제출 성사 신호는 셀렉터 무관하게 "크레딧 감소 OR 곡수 증가"로 판정.
